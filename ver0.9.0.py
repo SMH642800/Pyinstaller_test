@@ -8,10 +8,10 @@ import html
 import datetime
 import numpy as np 
 from PIL import Image
-from PySide6.QtCore import * 
 from PySide6.QtGui import * 
 from PySide6.QtWidgets import * 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QTimer
+from PySide6.QtWidgets import QApplication
 import pyscreenshot as ImageGrab
 from google.cloud import vision_v1
 from google.cloud import translate_v2 as translate
@@ -47,7 +47,7 @@ class MainMenuWindow(QMainWindow):
         super().__init__()
 
         # read config file
-        self.config_handle = config_handler
+        self.config_handler = config_handler
 
         # set private member
         self._frequency = ""
@@ -164,15 +164,15 @@ class MainMenuWindow(QMainWindow):
         self.text_label_palette.setColor(QPalette.Window, QColor(50, 50, 50))  # 设置背景颜色为浅灰色
 
         # 讀取 config file 中的 text_font_size
-        text_font_size = self.config_handle.get_font_size()
+        text_font_size = self.config_handler.get_font_size()
         self.update_text_font_size(text_font_size)
 
         # 讀取 config file 中的 text_font_color
-        text_font_color = self.config_handle.get_font_color()
+        text_font_color = self.config_handler.get_font_color()
         self.update_text_font_color(text_font_color)
 
         # 讀取 config file 中的 capture_frequency
-        frequency = self.config_handle.get_capture_frequency()
+        frequency = self.config_handler.get_capture_frequency()
         self.update_recognition_frequency(frequency)
 
         # Create a vertical layout
@@ -217,8 +217,8 @@ class MainMenuWindow(QMainWindow):
         self.screen_capture_window = None 
 
         # 設定Google Cloud金鑰環境變數
-        if self.config_handle.get_google_credential_path() != "":
-            google_key_file_path = self.config_handle.get_google_credential_path()
+        if self.config_handler.get_google_credential_path() != "":
+            google_key_file_path = self.config_handler.get_google_credential_path()
             self.check_google_credential_state(google_key_file_path)
             
         else:      
@@ -314,7 +314,7 @@ class MainMenuWindow(QMainWindow):
             self.show()
 
     def show_settings(self):
-        self.settings_window = SettingsWindow(self.config_handle)
+        self.settings_window = SettingsWindow(self.config_handler)
         self.settings_window.setting_window_closed.connect(self.set_main_and_capture_window_frame_window_back)
         self.settings_window.show()
 
@@ -423,14 +423,14 @@ class MainMenuWindow(QMainWindow):
             self.screen_capture_window.show()
 
         # 讀取 config file 中的 text_font_size
-        text_font_size = self.config_handle.get_font_size()
-        text_font_color = self.config_handle.get_font_color()
-        frequency = self.config_handle.get_capture_frequency()
+        text_font_size = self.config_handler.get_font_size()
+        text_font_color = self.config_handler.get_font_color()
+        frequency = self.config_handler.get_capture_frequency()
         self.update_text_font_size(text_font_size)
         self.update_text_font_color(text_font_color)
         self.update_recognition_frequency(frequency)
 
-        google_credential = self.config_handle.get_google_credential_path()
+        google_credential = self.config_handler.get_google_credential_path()
         self.check_google_credential_state(google_credential)
 
     def handle_screen_capture_window_closed(self):
@@ -748,7 +748,7 @@ if __name__ == "__main__":
     config_handler = ConfigHandler()
     config_handler.read_config_file()
 
-    # create pyqt5 app
+    # create pyside6 app
     App = QApplication(sys.argv)
     
     # Create the screen capture window and the main capturing control window

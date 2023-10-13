@@ -3,12 +3,11 @@
 import os
 import sys
 import shutil
-from PySide6.QtCore import * 
-from PySide6.QtGui import * 
-from PySide6.QtWidgets import * 
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QStandardPaths, QUrl, Signal
+from PySide6.QtGui import QFont, Qt, QDesktopServices
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QApplication, QWidget, QLabel, QComboBox, QPushButton, QFrame, QColorDialog, QFileDialog
 
-from config_handler import *
+from config_handler import ConfigHandler
 
 
 # 创建一个新的类以用于设置窗口
@@ -23,7 +22,7 @@ class SettingsWindow(QDialog):
         self._font_size = 16
 
         # 讀取 config file
-        self.config_handle = config_handler
+        self.config_handler = config_handler
 
         # Set the window background color to black
         # settings_window_palette = QPalette()
@@ -34,11 +33,11 @@ class SettingsWindow(QDialog):
         self.setWindowOpacity(0.99)
 
         # 設置參數
-        self._text_font_size = self.config_handle.get_font_size()
-        self._text_font_color = self.config_handle.get_font_color()
+        self._text_font_size = self.config_handler.get_font_size()
+        self._text_font_color = self.config_handler.get_font_color()
         self._text_font_color_name = self._text_font_color
-        self._frequency = self.config_handle.get_capture_frequency()
-        self._google_credentials = self.config_handle.get_google_credential_path()
+        self._frequency = self.config_handler.get_capture_frequency()
+        self._google_credentials = self.config_handler.get_google_credential_path()
 
         # 设置窗口标题和属性
         self.setWindowTitle("設定")
@@ -339,7 +338,7 @@ class SettingsWindow(QDialog):
         self._text_font_size = int(selected_font_size)
         
         # 保存用户设置到JSON配置文件
-        self.config_handle.set_font_size(self._text_font_size)
+        self.config_handler.set_font_size(self._text_font_size)
         
     def choose_text_color(self):
         # 打开颜色对话框，并根据用户的选择设置文本颜色
@@ -364,7 +363,7 @@ class SettingsWindow(QDialog):
 
             # 保存用户设置到 TOML 配置文件
             self._text_font_color = hex_color.upper()
-            self.config_handle.set_font_color(self._text_font_color)
+            self.config_handler.set_font_color(self._text_font_color)
 
     def update_recognition_frequency(self, selected_frequency):
         # 更新偵測的頻率
@@ -382,7 +381,7 @@ class SettingsWindow(QDialog):
                 self._frequency = "非常慢 (5 秒)" 
         
         # 保存用户设置到 TOML 配置文件
-        self.config_handle.set_capture_frequency(self._frequency)
+        self.config_handler.set_capture_frequency(self._frequency)
 
     def set_google_credentials(self):
         # 打开一个文件对话框，让用户选择 Google 凭证文件
@@ -393,8 +392,8 @@ class SettingsWindow(QDialog):
         file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
         file_dialog.setWindowTitle("Choose Google's Credential File")
         
-        # 设置初始目录（在这里设置为用户主目录，您可以更改为其他目录）
-        initial_directory = QDir.homePath()  # 用户主目录
+        # 设置初始目录（在这里设置为用户主目录）
+        initial_directory = QStandardPaths.writableLocation(QStandardPaths.HomeLocation)
         file_dialog.setDirectory(initial_directory)
 
         # 获取所选文件路径并根据文件路径设置 Google 凭证
@@ -405,14 +404,14 @@ class SettingsWindow(QDialog):
                 project_dir = os.path.dirname(os.path.abspath(__file__))  # 获取当前脚本所在的目录
                 new_file_path = os.path.join(project_dir, os.path.basename(credentials_file))
                 
-                previous_file_path = self.config_handle.get_google_credential_path()
+                previous_file_path = self.config_handler.get_google_credential_path()
                 if os.path.exists(previous_file_path):
                     os.remove(previous_file_path)  # 如果文件已存在，先删除它
 
                 try:
                     shutil.copy(credentials_file, new_file_path)
                     # 保存用户设置到 TOML 配置文件
-                    self.config_handle.set_google_credential_path(new_file_path)
+                    self.config_handler.set_google_credential_path(new_file_path)
                 except Exception as e:
                     pass
 
@@ -420,20 +419,19 @@ class SettingsWindow(QDialog):
         self.setting_window_closed.emit()
         event.accept()
 
-if __name__ == "__main__":
-    config_handler = ConfigHandler()
 
-    # create pyqt5 app
-    App = QApplication(sys.argv)
+# if __name__ == "__main__":
+#     # read config file class
+#     config_handler = ConfigHandler()
+#     config_handler.read_config_file()
+
+#     app = QApplication(sys.argv)
     
-    # Create the screen capture window and the main capturing control window
-    settings_window = SettingsWindow(config_handler)
+#     # Create the screen capture window and the main capturing control window
+#     settings_window = SettingsWindow(config_handler)
 
-    # Show the windows
-    settings_window.show()
-
-    count = 0
+#     # Show the windows
+#     settings_window.show()
     
-    # start the app
-    sys.exit(App.exec())
-  
+#     # start the app
+#     sys.exit(app.exec())
