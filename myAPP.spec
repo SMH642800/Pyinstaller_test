@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['app.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
     datas=[('sub-google-api.html', '.'), ('css', 'css'), ('img', 'img')],
@@ -10,7 +10,19 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PySide6.QtNetwork', 'PySide6.QtSql'],
+    excludes=[
+      'PySide6.QtNetwork', 
+      'PySide6.QtSql', 
+      'PyQt5',
+      'PySide6.QtDBus',
+      'PySide6.QtOpenGL',
+      'PySide6.QtPdf',
+      'PySide6.QtQml',
+      'PySide6.QtQmlModels',
+      'PySide6.QtQuick',
+      'PySide6.QtSvg',
+      'PySide6.QtVirtualKeyboard'
+    ],
     noarchive=False,
 )
 pyz = PYZ(a.pure)
