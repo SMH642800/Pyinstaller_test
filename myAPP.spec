@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['main_windowsOS.py'],
     pathex=[],
     binaries=[],
-    datas=[('sub-google-api.html', '.'), ('css', 'css'), ('img', 'img')],
+    datas=[('tataru.ico', '.'), ('sub-google-api.html', '.'), ('css', 'css'), ('img', 'img')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -13,14 +13,12 @@ a = Analysis(
     excludes=[
       'PySide6.QtNetwork', 
       'PySide6.QtSql', 
-      'PyQt5',
       'PySide6.QtDBus',
       'PySide6.QtOpenGL',
       'PySide6.QtPdf',
       'PySide6.QtQml',
       'PySide6.QtQmlModels',
       'PySide6.QtQuick',
-      'PySide6.QtSvg',
       'PySide6.QtVirtualKeyboard'
     ],
     noarchive=False,
@@ -30,32 +28,21 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
-    name='myAPP',
+    name='test',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
     console=False,
+    icon='tataru.ico',
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='myAPP',
-)
-app = BUNDLE(
-    coll,
-    name='myAPP.app',
-    icon=None,
-    bundle_identifier=None,
 )

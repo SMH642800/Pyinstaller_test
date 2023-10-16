@@ -5,14 +5,15 @@ import os
 import sys
 import cv2
 import html
+import subprocess
 import numpy as np 
 import pygetwindow as gw
+from io import BytesIO
 from PIL import Image,ImageGrab
 from multiprocessing import freeze_support  # <---add this
-from PySide6.QtGui import QPalette, QColor, QFontMetrics
-from PySide6.QtWidgets import QMainWindow, QMessageBox
-from PySide6.QtCore import Signal, QTimer, QProcess
-from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QPalette, QColor, QFontMetrics, QIcon, QPixmap
+from PySide6.QtWidgets import QMainWindow, QMessageBox, QApplication, QPushButton, QHBoxLayout, QWidget, QScrollArea
+from PySide6.QtCore import Signal, QTimer, QSize, Property, QObject, QEasingCurve, QPropertyAnimation, QProcess
 from google.cloud import vision_v1
 from google.cloud import translate_v2 as translate
 from google.oauth2 import service_account
@@ -36,11 +37,95 @@ def set_google_translation():
     # 初始化Google Cloud Translation API客戶端
     client_translate = translate.Client()   
 
-def request_screen_capture_permission():
-    # 使用 QProcess 执行 tccutil 命令请求权限
-    process = QProcess()
-    process.start("tccutil", ["--insert", "public.screen-Recording"])
-    process.waitForFinished()
+
+# create icon scale signal
+class IconScaler(QObject):
+    icon_size_changed = Signal(QSize)
+
+    def __init__(self):
+        super().__init__()
+        self._icon_size = QSize(32, 32)
+
+    @Property(QSize, notify=icon_size_changed)
+    def icon_size(self):
+        return self._icon_size
+
+    @icon_size.setter
+    def icon_size(self, size):
+        self._icon_size = size
+        self.icon_size_changed.emit(size)
+
+# create button scale class and add the animations when cursor hover、press、release the button
+class ScalableButton(QPushButton):
+    def __init__(self, name, icon_path, parent=None):
+        super().__init__(parent)
+        self.setMouseTracking(True)
+        self.icon_path = icon_path
+        self.icon_scaler = IconScaler()
+        self.is_pressed = False
+
+        # 创建一个属性动画
+        self.animation = QPropertyAnimation(self.icon_scaler, b"icon_size")
+        self.animation.setDuration(200)  # 动画持续时间（毫秒）
+        self.animation.setEasingCurve(QEasingCurve.InOutQuad)  # 使用适合的缓动曲线
+
+        # 连接 icon_size_changed 信号以更新按钮的图标大小
+        self.icon_scaler.icon_size_changed.connect(self.updateIconSize)
+
+        # 连接 pressed 信号和 released 信号以执行缩小和恢复操作
+        self.pressed.connect(self.onButtonPressed)
+        self.released.connect(self.onButtonReleased)
+
+        self.setObjectName(name)  # 设置按钮的对象名称
+
+        # 创建初始图标
+        self.createIcon(icon_path)
+
+        # 连接按钮的点击信号到自定义槽函数
+        #self.clicked.connect(self.onButtonClicked)
+
+    def createIcon(self, path):
+        # 创建一个图标
+        icon = QIcon(path)
+
+        # 设置图标到按钮
+        self.setIcon(icon)
+
+        # 设置初始图标大小
+        self.setIconSize(self.icon_scaler.icon_size)
+
+    def onButtonPressed(self):
+        # 鼠标按下按钮，缩小图标并更改为新图标（如果有）
+        self.animateIconSize(QSize(28, 28))
+        self.is_pressed = True
+
+    def onButtonReleased(self):
+        # 鼠标释放按钮，恢复原始图标大小
+        self.is_pressed = False
+        self.createIcon(self.icon_path)
+        self.animateIconSize(QSize(40, 40))
+
+    # def onButtonClicked(self):
+    #     # 当按钮被点击时，执行其他函数
+    #     print(f"{self.objectName()} clicked")
+
+    def enterEvent(self, event):
+        # 鼠标进入按钮，放大图标
+        if not self.is_pressed:  # 仅当按钮未按下时放大
+            self.animateIconSize(QSize(40, 40))
+
+    def leaveEvent(self, event):
+        # 鼠标离开按钮，还原原始图标大小
+        if not self.is_pressed:  # 仅当按钮未按下时还原
+            self.animateIconSize(QSize(32, 32))
+
+    def animateIconSize(self, target_size):
+        self.animation.setStartValue(self.icon_scaler.icon_size)
+        self.animation.setEndValue(target_size)
+        self.animation.start()
+
+    def updateIconSize(self, size):
+        self.setIconSize(size)
 
 
 class MainMenuWindow(QMainWindow):
@@ -83,33 +168,183 @@ class MainMenuWindow(QMainWindow):
         # Set the window geometry
         screen_geometry = QApplication.primaryScreen().geometry()
         self.setGeometry(screen_geometry.x() + (screen_geometry.width() // 3) * 2, 
-                         screen_geometry.y() + screen_geometry.height() // 3,
-                         screen_geometry.width() // 5, screen_geometry.height() // 2)
+                         screen_geometry.y() + screen_geometry.height() // 4,
+                         screen_geometry.width() // 4.5, screen_geometry.height() // 2)
     
-        # Create a button to add the screen capture window
-        self.add_window_button = QPushButton("Add Capture Window", self)
+                # Create a button to add the screen capture window
+        #self.add_window_button = QPushButton("", self)
+        new_file_path = os.path.join(self.app_dir, "img/ui/add_capture_window.png")
+        self.add_window_button = ScalableButton("add_window_button", new_file_path)
+        self.add_window_button.setToolTip("新增螢幕擷取視窗")
+        # 使用样式表自定义按钮的外观
+        self.add_window_button.setStyleSheet(
+            "QPushButton {"
+            "    background-color: rgba(0, 0, 0, 0);"
+            "    color: rgb(58, 134, 255);"
+            #"    border: 2px solid rgb(58, 134, 255);"
+            "    border-radius: 8px;"
+            "}"
+            "QPushButton:hover {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #488EF7, stop: 1 #3478F6);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+            "QPushButton:pressed {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+        )
+
+        # set icon to add_capture_window_button
+        # add_capture_window_path = "img/ui/screenshot_monitor_white_24dp.svg"
+        # add_capture_window_icon = QIcon(add_capture_window_path)
+        # self.add_window_button.setIcon(add_capture_window_icon)
+        # self.add_window_button.setIconSize(QSize(32, 32))  # Scale the icon size
+        self.add_window_button.setMinimumSize(44, 44)  # Set the minimum size for the button to ensure the icon fits
+
         self.add_window_button.clicked.connect(self.add_or_check_screen_capture_window)
 
         # Create a capturing button to start screen capture
-        self.action_button = QPushButton("Capture", self)
+        #self.action_button = QPushButton("", self)
+        new_file_path = os.path.join(self.app_dir, "img/ui/record_button_start.svg")
+        self.action_button = ScalableButton("action_button", new_file_path)
+        self.action_button.setToolTip("開始擷取畫面")
+        self.action_button.setStyleSheet(
+            "QPushButton {"
+            "    background-color: rgba(0, 0, 0, 0);"
+            "    color: rgb(58, 134, 255);"
+            #"    border: 2px solid rgb(58, 134, 255);"
+            "    border-radius: 8px;"
+            "}"
+            "QPushButton:hover {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #488EF7, stop: 1 #3478F6);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+            "QPushButton:pressed {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+        )
+
+        # set icon to action_button
+        # action_icon_path = "img/ui/radio_button_unchecked_white_24dp.svg"
+        # action_icon = QIcon(action_icon_path)
+        # self.action_button.setIcon(action_icon)
+        # self.action_button.setIconSize(QSize(32, 32))  # Scale the icon size
+        self.action_button.setMinimumSize(44, 44)  # Set the minimum size for the button to ensure the icon fits
+
         self.action_button.clicked.connect(self.toggle_capture)
         self.capturing = False  # Track capturing state
 
+        # Create a button to capture the screenshot
+        new_file_path = os.path.join(self.app_dir, "img/ui/screenshot_button.png")
+        self.screenshot_button = ScalableButton("add_window_button", new_file_path)
+        self.screenshot_button.setToolTip("螢幕截圖")
+        # 使用样式表自定义按钮的外观
+        self.screenshot_button.setStyleSheet(
+            "QPushButton {"
+            "    background-color: rgba(0, 0, 0, 0);"
+            "    color: rgb(58, 134, 255);"
+            #"    border: 2px solid rgb(58, 134, 255);"
+            "    border-radius: 8px;"
+            "}"
+            "QPushButton:hover {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #488EF7, stop: 1 #3478F6);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+            "QPushButton:pressed {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+        )
+
+        # set icon to add_capture_window_button
+        # add_capture_window_path = "img/ui/screenshot_monitor_white_24dp.svg"
+        # add_capture_window_icon = QIcon(add_capture_window_path)
+        # self.add_window_button.setIcon(add_capture_window_icon)
+        # self.add_window_button.setIconSize(QSize(32, 32))  # Scale the icon size
+        self.screenshot_button.setMinimumSize(44, 44)  # Set the minimum size for the button to ensure the icon fits
+
+        # set timer for delay process the capture_screenshot function
+        self.screenshot_timer = QTimer(self)
+        self.screenshot_timer.timeout.connect(self.capture_screenshot)
+        self.screenshot_button.clicked.connect(self.delayed_process_screenshot_function)
+
         # Create a button to pin the window on the toppest
-        self.pin_button = QPushButton("not pin", self)
+        # self.pin_button = QPushButton("", self)
+        new_file_path = os.path.join(self.app_dir, "img/ui/pin_button_disable.png")
+        self.pin_button = ScalableButton("pin_button", new_file_path)
+        self.pin_button.setToolTip("取消釘選")
+        self.pin_button.setStyleSheet(
+            "QPushButton {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+            #"    background-color: rgba(0, 0, 0, 0);"
+            "    border-radius: 8px;"
+            "}"
+            "QPushButton:hover {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #488EF7, stop: 1 #3478F6);"
+            "}"
+            "QPushButton:pressed {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+            "}"
+        )
+
+        # set icon to pin_button
+        # pin_icon_path = "img/ui/near_me_disabled_white_24dp.svg"
+        # pin_icon = QIcon(pin_icon_path)
+        # self.pin_button.setIcon(pin_icon)
+        # self.pin_button.setIconSize(QSize(32, 32))  # Scale the icon size
+        self.pin_button.setMinimumSize(44, 44)  # Set the minimum size for the button to ensure the icon fits
+
         self.pin_button.clicked.connect(self.pin_on_top)
         self.is_pined = True  # Track pining state
 
         # Create a button to open settings window
-        self.settings_button = QPushButton("Settings", self)
+        # self.settings_button = QPushButton("", self)
+        new_file_path = os.path.join(self.app_dir, "img/ui/settings_button.svg")
+        self.settings_button = ScalableButton("settings_button", new_file_path)
+        self.settings_button.setToolTip("設定")
+        self.settings_button.setStyleSheet(
+            "QPushButton {"
+            "    background-color: rgba(0, 0, 0, 0);"
+            "    color: rgb(58, 134, 255);"
+            #"    border: 2px solid rgb(58, 134, 255);"
+            "    border-radius: 8px;"
+            "}"
+            "QPushButton:hover {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #488EF7, stop: 1 #3478F6);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+            "QPushButton:pressed {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+        )
+
+        # set icon to settings_button
+        # settings_icon_path = "img/ui/settings_white_24dp.svg"
+        # settings_icon = QIcon(settings_icon_path)
+        # self.settings_button.setIcon(settings_icon)
+        # self.settings_button.setIconSize(QSize(32, 32))  # Scale the icon size
+        self.settings_button.setMinimumSize(44, 44)  # Set the minimum size for the button to ensure the icon fits
+
+        # connect button to show_settings funciton
         self.settings_button.clicked.connect(self.show_settings)
 
+
         # Set button backgrounds to transparent
-        #self.add_window_button.setStyleSheet('QPushButton {background-color: transparent; color: red;}')
-        self.add_window_button.setStyleSheet('QPushButton {background-color: white; color: red;}')
-        self.action_button.setStyleSheet('QPushButton {background-color: white; color: red;}')
-        self.pin_button.setStyleSheet('QPushButton {background-color: white; color: red;}')
-        self.settings_button.setStyleSheet('QPushButton {background-color: white; color: red;}')
+        # #self.add_window_button.setStyleSheet('QPushButton {background-color: transparent; color: red;}')
+        # self.add_window_button.setStyleSheet('QPushButton {background-color: white; color: red;}')
+        # self.action_button.setStyleSheet('QPushButton {background-color: white; color: red;}')
+        # self.pin_button.setStyleSheet('QPushButton {background-color: white; color: red;}')
+        # self.settings_button.setStyleSheet('QPushButton {background-color: white; color: red;}')
 
         # 創建用於顯示 google credential憑證狀態 的 QLabel
         self.google_credential_state = QLabel("Google 憑證：", self)
@@ -128,7 +363,7 @@ class MainMenuWindow(QMainWindow):
         self.line.setLineWidth(1)  # 設置線條寬度為 2px
 
         # 创建用于显示OCR识别文本的QLabel
-        self.ocr_label = QLabel("OCR Recognized Text:", self)
+        self.ocr_label = QLabel("  原 文：", self)
         self.ocr_label.setAutoFillBackground(False)  # 设置背景颜色為透明
         self.ocr_label.setStyleSheet("color: white;")  # 設置文字顏色為白色
         self.ocr_text_label = QLabel("", self)
@@ -137,15 +372,35 @@ class MainMenuWindow(QMainWindow):
         self.ocr_text_label.setContentsMargins(10, 10, 10, 10)  # 設置距離最左、最右、最上、最下的內邊距為 10px
         self.ocr_text_label.setWordWrap(True)  # 启用自动换行
 
+        # Create a scroll area
+        ocr_scroll_area = QScrollArea()
+        ocr_scroll_area.setWidgetResizable(True)
+        # Remove the frame/border
+        ocr_scroll_area.setFrameShape(QScrollArea.NoFrame)
+        
+        # Set the label as the widget for the scroll area
+        ocr_scroll_area.setWidget(self.ocr_text_label)
+
         # 创建用于显示翻译后文本的QLabel
-        self.translation_label = QLabel("Translation:", self)
+        self.translation_label = QLabel("  翻 譯：", self)
         self.translation_label.setStyleSheet("color: white;")  # 設置文字顏色為白色
         self.translation_label.setAutoFillBackground(False)  # 设置背景颜色為透明
         self.translation_text_label = QLabel("", self)
-        self.translation_text_label.setStyleSheet("background-color: rgb(50, 50, 50); border-radius: 10px;")
         self.translation_text_label.setAutoFillBackground(True)  # 允许设置背景颜色
+        self.translation_text_label.setStyleSheet("background-color: rgb(50, 50, 50); border-radius: 10px;")
         self.translation_text_label.setContentsMargins(10, 10, 10, 10)  # 設置距離最左、最右、最上、最下的內邊距為 10px
+        # self.translation_text_label.setMinimumWidth((screen_geometry.width() // 5) - 40)  # 设置最小宽度为 200 像素
         self.translation_text_label.setWordWrap(True)  # 启用自动换行
+
+        # Create a scroll area
+        transaltion_scroll_area = QScrollArea()
+        transaltion_scroll_area.setWidgetResizable(True)
+
+        # Remove the frame/border
+        transaltion_scroll_area.setFrameShape(QScrollArea.NoFrame)
+        
+        # Set the label as the widget for the scroll area
+        transaltion_scroll_area.setWidget(self.translation_text_label)
 
         # 設置 ocr_lable 和 ocr_translation_label 的字體大小與粗細度
         font = QFont()
@@ -173,8 +428,8 @@ class MainMenuWindow(QMainWindow):
         self.system_state.setFixedHeight(state_label_height)
 
         # 创建一个QPalette对象来设置 OCR_result_text 的背景及文字颜色
-        self.text_label_palette = QPalette()
-        self.text_label_palette.setColor(QPalette.Window, QColor(50, 50, 50))  # 设置背景颜色为浅灰色
+        # self.text_label_palette = QPalette()
+        # self.text_label_palette.setColor(QPalette.Window, QColor(50, 50, 50))  # 设置背景颜色为浅灰色
 
         # 讀取 config file 中的 text_font_size
         text_font_size = self.config_handler.get_font_size()
@@ -195,7 +450,9 @@ class MainMenuWindow(QMainWindow):
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.add_window_button)
         button_layout.addWidget(self.action_button)
+        button_layout.addWidget(self.screenshot_button)
         button_layout.addWidget(self.pin_button)
+        button_layout.addStretch(1)  # 弹簧项，推动右边的按钮靠右
         button_layout.addWidget(self.settings_button)
 
         # Create a horizontal layout for google_credential_state, system_state
@@ -212,9 +469,11 @@ class MainMenuWindow(QMainWindow):
 
         # Add ocr_label and translation_label to the layout
         layout.addWidget(self.ocr_label)
-        layout.addWidget(self.ocr_text_label)
+        layout.addWidget(ocr_scroll_area)
+        # layout.addWidget(self.ocr_text_label)
         layout.addWidget(self.translation_label)
-        layout.addWidget(self.translation_text_label)
+        layout.addWidget(transaltion_scroll_area)
+        # layout.addWidget(self.translation_text_label)
 
         # Create a QWidget as a container for the layout
         widget = QWidget(self)
@@ -229,19 +488,21 @@ class MainMenuWindow(QMainWindow):
         # Initialize the attribute
         self.screen_capture_window = None 
 
+        # set timer for messagebox delayed show
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.show_message_box)
+
         # 設定Google Cloud金鑰環境變數
         if self.config_handler.get_google_credential_path() != "":
             google_key_file_path = self.config_handler.get_google_credential_path()
             self.check_google_credential_state(google_key_file_path)
             
         else:      
-            # set timer for messagebox delayed show
-            self.timer = QTimer(self)
-            self.timer.timeout.connect(self.show_message_box)
+            # messagebox delayed show
             self.delayed_show_message_box()
 
             # set only setting button enabled
-            for button in [self.add_window_button, self.action_button, self.pin_button]:
+            for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button]:
                 button.setEnabled(False)
 
             # 設置 google_credential_label
@@ -266,7 +527,7 @@ class MainMenuWindow(QMainWindow):
                 self.google_credential_state.setText("Google 憑證： <font color='green'>憑證有效</font> ")
 
                 # set all button enabled
-                for button in [self.add_window_button, self.action_button, self.pin_button, self.settings_button]:
+                for button in [self.add_window_button, self.action_button, self.pin_button, self.screenshot_button, self.settings_button]:
                     button.setEnabled(True)
 
             except Exception as e:
@@ -274,15 +535,16 @@ class MainMenuWindow(QMainWindow):
                 self.google_credential_state.setText("Google 憑證： <font color='red'>憑證無效</font> ")
 
                 # set only setting button enabled
-                for button in [self.add_window_button, self.action_button, self.pin_button]:
+                for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button]:
                     button.setEnabled(False)
                 self.settings_button.setEnabled(True)
         else:
             # 設置 google_credential_label
             self.google_credential_state.setText("Google 憑證： <font color='red'>無設置憑證</font> ")
+            self.delayed_show_message_box()
 
             # set only setting button enabled
-            for button in [self.add_window_button, self.action_button, self.pin_button]:
+            for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button]:
                 button.setEnabled(False)
             self.settings_button.setEnabled(True)
 
@@ -293,13 +555,18 @@ class MainMenuWindow(QMainWindow):
     def show_message_box(self):
         # 停止计时器
         self.timer.stop()
+        
+        new_file_path = os.path.join(self.app_dir, "img/index/tataru_round.png")
+        customIcon = QPixmap(new_file_path)  # 加载图标
+
         # 创建消息框
         msg_box = QMessageBox()
-        msg_box.setWindowTitle("Information")
-        msg_box.setText("Welcome to this APP. \n"
-            "Please go to 'Settings' -> 'System' -> 'Set Google Credentials' "
-            "to configure Google credentials before using the app.")
-        msg_box.setIcon(QMessageBox.Information)
+        msg_box.setWindowTitle("Welcome ! ")
+        msg_box.setIconPixmap(customIcon)
+        msg_box.setText("歡迎使用「此應用程式」！ \n"
+            "\n在使用此應用程式之前，請先去「設定」  ➜  「系統」  ➜  「設定 Google 憑證」 "
+            "，上傳已申請的 Google 憑證。")
+
         # 设置消息框始终显示在最顶部
         msg_box.setWindowFlags(msg_box.windowFlags() | Qt.WindowStaysOnTopHint)
         # 显示消息框
@@ -311,17 +578,101 @@ class MainMenuWindow(QMainWindow):
         else:
             self.start_capture()
 
+    def delayed_process_screenshot_function(self):
+        # start timer to delay process the screenshot function
+        self.screenshot_timer.start(300)  # delay 0.3 seconds
+
+    def capture_screenshot(self):
+        # stop screenshot_timer
+        self.screenshot_timer.stop()
+
+        # get screenshot_path
+        screenshot_path = os.path.join(self.app_dir, "screenshot.png")
+
+        # 調用 Snipping Tool 並將 screenshot 從 clipboard 上抓取並儲存起來
+        subprocess.run(["snippingtool.exe"])
+        screenshot = ImageGrab.grabclipboard()
+        screenshot.save(screenshot_path)
+
+        if os.path.exists(screenshot_path):
+            # 打开截图文件并转换为灰度图像
+            with Image.open(screenshot_path) as img:
+                img_gray = img.convert("L")
+                img_bytes = BytesIO()
+                img_gray.save(img_bytes, format="PNG")
+                image_data = img_bytes.getvalue()
+
+            # 使用Google Cloud Vision API進行文字辨識
+            image = vision_v1.Image(content=image_data)
+            response = client_vision.text_detection(image=image)
+            texts = response.text_annotations
+
+            # 提取辨識到的文字
+            if texts:
+                detected_text = texts[0].description
+
+                # 设置OCR识别文本
+                self.ocr_text_label.setText(detected_text)
+    
+                # 將辨識的文字按行分割
+                lines = detected_text.replace("\n", "")
+
+                # Google 翻譯
+                target_language = "zh-TW"  # 將此替換為你想要的目標語言代碼（例如：英文 --> en, 繁體中文 --> zh-TW）
+                translated_lines = client_translate.translate(lines, target_language=target_language)
+
+                # Unescape HTML entities
+                unescape_translated_text = html.unescape(translated_lines["translatedText"])
+
+                # 將翻譯後的行重新組合成一個帶有換行的字符串
+                translated_text_with_newlines = unescape_translated_text.replace("。", "。\n").replace('？', '？\n').replace('！', '！\n')  # 以句點和問號為換行分界點
+                self.translation_text_label.setText(translated_text_with_newlines)
+                #main_capturing_window.translation_text_label.setText(unescape_translated_text)  # 完全不以句點和問號為換行分界點
+            else:
+                pass
+
+            # delete screenshot image after ocr complete
+            os.remove(screenshot_path)
+
     def pin_on_top(self):
         if self.is_pined:
             self.is_pined = False 
-            self.pin_button.setText("pin")
+            new_file_path = os.path.join(self.app_dir, "img/ui/pin_button_enable.png")
+            self.pin_button.createIcon(new_file_path)
+            self.pin_button.setToolTip("釘選在最上層")
+            self.pin_button.setStyleSheet(
+                "QPushButton {"
+                "    background-color: rgba(0, 0, 0, 0);"
+                "    border-radius: 8px;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #488EF7, stop: 1 #3478F6);"
+                "}"
+                "QPushButton:pressed {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+                "}"
+            )
 
             # 移除screen_capture_window的最上层标志
             self.setWindowFlag(Qt.WindowStaysOnTopHint, False)
             self.show()
         else:
             self.is_pined = True 
-            self.pin_button.setText("not pin")
+            new_file_path = os.path.join(self.app_dir, "img/ui/pin_button_disable.png")
+            self.pin_button.createIcon(new_file_path)
+            self.pin_button.setToolTip("取消釘選")
+            self.pin_button.setStyleSheet(
+                "QPushButton {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+                "    border-radius: 8px;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #488EF7, stop: 1 #3478F6);"
+                "}"
+                "QPushButton:pressed {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+                "}"
+            )
 
             # 恢复screen_capture_window的最上层标志
             self.setWindowFlag(Qt.WindowStaysOnTopHint)
@@ -395,7 +746,7 @@ class MainMenuWindow(QMainWindow):
     def add_or_check_screen_capture_window(self):
         # Check if a screen capture window is already open
         if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
-            QMessageBox.warning(self, "Warning", "You already have the Screen Capture Window open.")
+            QMessageBox.warning(self, "Warning", "你已經開啟擷取視窗了!")
         else:
             # Create and show the screen capture window
             self.screen_capture_window = ScreenCaptureWindow()
@@ -407,11 +758,17 @@ class MainMenuWindow(QMainWindow):
     def start_capture(self):
         if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
             self.capturing = True 
-            self.action_button.setText("Stop")
+            new_file_path = os.path.join(self.app_dir, "img/ui/record_button_stop.png")
+            self.action_button.createIcon(new_file_path)
+            self.action_button.setToolTip("停止擷取畫面")
+
             self.action_button.clicked.disconnect()
             self.action_button.clicked.connect(self.stop_capture)
+
             self.screen_capture_window.start_capture()
+
             self.add_window_button.setEnabled(False)
+            self.screenshot_button.setEnabled(False)
             self.settings_button.setEnabled(False)
 
             # 移除screen_capture_window的最上层标志
@@ -422,7 +779,8 @@ class MainMenuWindow(QMainWindow):
             self.update_system_state()
             self.capturing_system_state_timer.start(1000) # 每 1 秒更新一次 system_state_label 顯示狀態
         else:
-            QMessageBox.warning(self, "Warning", "You haven't opened the Screen Capture Window yet.")
+            # 创建消息框
+            QMessageBox.warning(self, "Warning", "你尚未開啟擷取視窗!")
 
     def update_system_state(self):
         if self.system_state_flag:
@@ -438,11 +796,17 @@ class MainMenuWindow(QMainWindow):
             self.capturing_system_state_timer.stop()
 
             self.capturing = False
-            self.action_button.setText("Capture")
+            new_file_path = os.path.join(self.app_dir, "img/ui/record_button_start.svg")
+            self.action_button.createIcon(new_file_path)
+            self.action_button.setToolTip("開始擷取畫面")
+
             self.action_button.clicked.disconnect()
             self.action_button.clicked.connect(self.toggle_capture)
+
             self.screen_capture_window.stop_capture()
+
             self.add_window_button.setEnabled(True)
+            self.screenshot_button.setEnabled(True)
             self.settings_button.setEnabled(True)
 
             # 恢复screen_capture_window的最上层标志
@@ -496,7 +860,7 @@ class ScreenCaptureWindow(QMainWindow):
         self.previous_image = None
   
         # set the title
-        self.setWindowTitle("Screen Capture region")
+        self.setWindowTitle("擷取視窗")
 
         # Set the window background color to black
         capture_window_palette = QPalette()
@@ -504,7 +868,7 @@ class ScreenCaptureWindow(QMainWindow):
         self.setPalette(capture_window_palette)
 
         # 設置視窗的特明度
-        self.setWindowOpacity(0.6)
+        self.setWindowOpacity(0.7)
 
         # 创建一个水平布局管理器
         layout = QHBoxLayout()
@@ -577,8 +941,8 @@ class ScreenCaptureWindow(QMainWindow):
 
     def stop_capture(self):
         self.timer.stop()
-        #self.force_update_timer.stop()
-        QMessageBox.information(self, "Info", "Screen capture stopped.")
+
+        QMessageBox.information(self, "Info", "已停止擷取!")
 
         # 恢复窗口透明度和边界线条
         self.setWindowOpacity(0.7)
@@ -593,7 +957,7 @@ class ScreenCaptureWindow(QMainWindow):
         global capture_start
 
         if self.isVisible():
-            window = gw.getWindowsWithTitle("Screen Capture region")[0]
+            window = gw.getWindowsWithTitle("擷取視窗")[0]
             title_bar_height = 30
 
             x, y, width, height = window.left, window.top+title_bar_height, window.width, window.height-title_bar_height
@@ -717,9 +1081,9 @@ class ScreenCaptureWindow(QMainWindow):
             unescape_translated_text = html.unescape(translated_lines["translatedText"])
 
             # 將翻譯後的行重新組合成一個帶有換行的字符串
-            translated_text_with_newlines = unescape_translated_text.replace("。", "。\n").replace('？', '？\n')  # 以句點和問號為換行分界點
+            translated_text_with_newlines = unescape_translated_text.replace("。", "。\n").replace('？', '？\n').replace('！', '！\n')  # 以句點和問號為換行分界點
             main_capturing_window.translation_text_label.setText(translated_text_with_newlines)
-            main_capturing_window.translation_text_label.setText(unescape_translated_text)  # 完全不以句點和問號為換行分界點
+            #main_capturing_window.translation_text_label.setText(unescape_translated_text)  # 完全不以句點和問號為換行分界點
             
         else:
             pass
@@ -736,14 +1100,20 @@ if __name__ == "__main__":
     # create pyside6 app
     App = QApplication(sys.argv)
 
-    
     # Create the screen capture window and the main capturing control window
     main_capturing_window = MainMenuWindow(config_handler)
 
+    # 設置應用程序圖標
+    if getattr(sys, 'frozen', False):
+        # 应用程序被打包
+        app_dir = sys._MEIPASS
+    else:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+    ico_path = os.path.join(app_dir, "tataru.ico")
+    main_capturing_window.setWindowIcon(QIcon(ico_path))
+
     # Show the windows
     main_capturing_window.show()
-
-    count = 0
     
     # start the app
     sys.exit(App.exec())
