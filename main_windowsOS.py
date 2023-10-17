@@ -304,6 +304,40 @@ class MainMenuWindow(QMainWindow):
         self.pin_button.clicked.connect(self.pin_on_top)
         self.is_pined = True  # Track pining state
 
+        # Create a button to clear label text
+        # self.settings_button = QPushButton("", self)
+        new_file_path = os.path.join(self.app_dir, "img/ui/delete_button.svg")
+        self.clear_text_button = ScalableButton("clear_text_button", new_file_path)
+        self.clear_text_button.setToolTip("清空文本")
+        self.clear_text_button.setStyleSheet(
+            "QPushButton {"
+            "    background-color: rgba(0, 0, 0, 0);"
+            # "    color: rgb(58, 134, 255);"
+            #"    border: 2px solid rgb(58, 134, 255);"
+            "    border-radius: 8px;"
+            "}"
+            "QPushButton:hover {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #EB6777, stop: 1 #E63F46);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+            "QPushButton:pressed {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6E2C35, stop: 1 #6D181A);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+        )
+
+        # set icon to settings_button
+        # settings_icon_path = "img/ui/settings_white_24dp.svg"
+        # settings_icon = QIcon(settings_icon_path)
+        # self.settings_button.setIcon(settings_icon)
+        # self.settings_button.setIconSize(QSize(32, 32))  # Scale the icon size
+        self.clear_text_button.setMinimumSize(44, 44)  # Set the minimum size for the button to ensure the icon fits
+
+        # connect button to show_settings funciton
+        self.clear_text_button.clicked.connect(self.clear_label_text)
+
         # Create a button to open settings window
         # self.settings_button = QPushButton("", self)
         new_file_path = os.path.join(self.app_dir, "img/ui/settings_button.svg")
@@ -377,6 +411,7 @@ class MainMenuWindow(QMainWindow):
         ocr_scroll_area.setWidgetResizable(True)
         # Remove the frame/border
         ocr_scroll_area.setFrameShape(QScrollArea.NoFrame)
+        ocr_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         
         # Set the label as the widget for the scroll area
         ocr_scroll_area.setWidget(self.ocr_text_label)
@@ -398,6 +433,7 @@ class MainMenuWindow(QMainWindow):
 
         # Remove the frame/border
         transaltion_scroll_area.setFrameShape(QScrollArea.NoFrame)
+        transaltion_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         
         # Set the label as the widget for the scroll area
         transaltion_scroll_area.setWidget(self.translation_text_label)
@@ -453,6 +489,7 @@ class MainMenuWindow(QMainWindow):
         button_layout.addWidget(self.screenshot_button)
         button_layout.addWidget(self.pin_button)
         button_layout.addStretch(1)  # 弹簧项，推动右边的按钮靠右
+        button_layout.addWidget(self.clear_text_button)
         button_layout.addWidget(self.settings_button)
 
         # Create a horizontal layout for google_credential_state, system_state
@@ -498,7 +535,9 @@ class MainMenuWindow(QMainWindow):
             self.check_google_credential_state(google_key_file_path)
             
         else:      
-            # messagebox delayed show
+            # set timer for messagebox delayed show
+            self.timer = QTimer(self)
+            self.timer.timeout.connect(self.show_message_box)
             self.delayed_show_message_box()
 
             # set only setting button enabled
@@ -527,7 +566,7 @@ class MainMenuWindow(QMainWindow):
                 self.google_credential_state.setText("Google 憑證： <font color='green'>憑證有效</font> ")
 
                 # set all button enabled
-                for button in [self.add_window_button, self.action_button, self.pin_button, self.screenshot_button, self.settings_button]:
+                for button in [self.add_window_button, self.action_button, self.pin_button, self.screenshot_button, self.clear_text_button, self.settings_button]:
                     button.setEnabled(True)
 
             except Exception as e:
@@ -535,16 +574,20 @@ class MainMenuWindow(QMainWindow):
                 self.google_credential_state.setText("Google 憑證： <font color='red'>憑證無效</font> ")
 
                 # set only setting button enabled
-                for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button]:
+                for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button]:
                     button.setEnabled(False)
                 self.settings_button.setEnabled(True)
         else:
-            # 設置 google_credential_label
-            self.google_credential_state.setText("Google 憑證： <font color='red'>無設置憑證</font> ")
+            # set timer for messagebox delayed show
+            self.timer = QTimer(self)
+            self.timer.timeout.connect(self.show_message_box)
             self.delayed_show_message_box()
 
+            # 設置 google_credential_label
+            self.google_credential_state.setText("Google 憑證： <font color='red'>無設置憑證</font> ")
+
             # set only setting button enabled
-            for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button]:
+            for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button]:
                 button.setEnabled(False)
             self.settings_button.setEnabled(True)
 
@@ -564,7 +607,7 @@ class MainMenuWindow(QMainWindow):
         msg_box.setWindowTitle("Welcome ! ")
         msg_box.setIconPixmap(customIcon)
         msg_box.setText("歡迎使用「此應用程式」！ \n"
-            "\n在使用此應用程式之前，請先去「設定」  ➜  「系統」  ➜  「設定 Google 憑證」 "
+            "\n在使用此應用程式之前，請至 【設定】 > 【系統】 > 【設置 Google 憑證】 "
             "，上傳已申請的 Google 憑證。")
 
         # 设置消息框始终显示在最顶部
@@ -578,7 +621,39 @@ class MainMenuWindow(QMainWindow):
         else:
             self.start_capture()
 
+    def minimize_all_open_windows(self):
+        # minimize the main window
+        # self.showMinimized()
+        # 設定窗口標誌，使其保持在最下層
+        self.setWindowFlags(Qt.WindowStaysOnBottomHint)
+
+        # check if a screen capture window is already open
+        if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
+            # minimize the screen capture window
+            # self.screen_capture_window.showMinimized()
+            self.screen_capture_window.setWindowFlags(Qt.WindowStaysOnBottomHint)
+
+    def restore_all_windows(self):
+        # restore the main window after capturing the screenshot
+        self.setWindowFlag(Qt.WindowStaysOnBottomHint, False)
+        if self.is_pined:
+            self.setWindowFlags(Qt.WindowStaysOnTopHint)
+        self.show()
+        
+        self.is_pined = True
+
+        # check if a screen capture window is already open
+        if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
+            # restore the screen capture window after capturing the screenshot
+            # self.screen_capture_window.showNormal()
+            self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnBottomHint, False)
+            if self.is_pined:
+                self.screen_capture_window.setWindowFlags(Qt.WindowStaysOnTopHint)
+            self.screen_capture_window.show()
+
     def delayed_process_screenshot_function(self):
+        self.minimize_all_open_windows()
+
         # start timer to delay process the screenshot function
         self.screenshot_timer.start(300)  # delay 0.3 seconds
 
@@ -593,6 +668,8 @@ class MainMenuWindow(QMainWindow):
         subprocess.run(["snippingtool.exe"])
         screenshot = ImageGrab.grabclipboard()
         screenshot.save(screenshot_path)
+
+        self.restore_all_windows()
 
         if os.path.exists(screenshot_path):
             # 打开截图文件并转换为灰度图像
@@ -626,13 +703,15 @@ class MainMenuWindow(QMainWindow):
 
                 # 將翻譯後的行重新組合成一個帶有換行的字符串
                 translated_text_with_newlines = unescape_translated_text.replace("。", "。\n").replace('？', '？\n').replace('！', '！\n')  # 以句點和問號為換行分界點
-                self.translation_text_label.setText(translated_text_with_newlines)
-                #main_capturing_window.translation_text_label.setText(unescape_translated_text)  # 完全不以句點和問號為換行分界點
+                # self.translation_text_label.setText(translated_text_with_newlines)
+                self.translation_text_label.setText(unescape_translated_text)  # 完全不以句點和問號為換行分界點
             else:
                 pass
 
             # delete screenshot image after ocr complete
             os.remove(screenshot_path)
+            # make sure main window show up (double check)
+            #self.show()
 
     def pin_on_top(self):
         if self.is_pined:
@@ -656,6 +735,12 @@ class MainMenuWindow(QMainWindow):
             # 移除screen_capture_window的最上层标志
             self.setWindowFlag(Qt.WindowStaysOnTopHint, False)
             self.show()
+
+            
+            # 如果screen_capture_window存在, 一併移除最上層標誌
+            if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
+                self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint, False)
+                self.screen_capture_window.show()
         else:
             self.is_pined = True 
             new_file_path = os.path.join(self.app_dir, "img/ui/pin_button_disable.png")
@@ -677,6 +762,15 @@ class MainMenuWindow(QMainWindow):
             # 恢复screen_capture_window的最上层标志
             self.setWindowFlag(Qt.WindowStaysOnTopHint)
             self.show()
+            
+            # 如果screen_capture_window存在, 一併恢復最上層標誌
+            if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
+                self.screen_capture_window.setWindowFlags(Qt.WindowStaysOnTopHint)
+                self.screen_capture_window.show()
+
+    def clear_label_text(self):
+        self.ocr_text_label.setText("")
+        self.translation_text_label.setText("")
 
     def show_settings(self):
         # 如果screen_capture_window存在, 一併禁用窗口
@@ -746,13 +840,24 @@ class MainMenuWindow(QMainWindow):
     def add_or_check_screen_capture_window(self):
         # Check if a screen capture window is already open
         if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
+            # 将最小化的窗口恢复到正常状态
+            self.screen_capture_window.setWindowFlags(Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint)  # 禁用最大化功能
+            if self.is_pined:
+                self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint)  # 先將 screen capture window 显示在最上面
+            else:
+                self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint | False)  # 將 screen capture window 显示在最上面的 flag 拿掉
+            
+            self.screen_capture_window.showNormal()
+            self.screen_capture_window.show()
+
             QMessageBox.warning(self, "Warning", "你已經開啟擷取視窗了!")
         else:
             # Create and show the screen capture window
             self.screen_capture_window = ScreenCaptureWindow()
             self.screen_capture_window.closed.connect(self.handle_screen_capture_window_closed)
-            self.screen_capture_window.setWindowFlags(Qt.WindowStaysOnTopHint)  # 设置窗口标志，使其始终显示在最上面
             self.screen_capture_window.setWindowFlags(Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint)  # 禁用最大化功能
+            if self.is_pined:
+                self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint)  # 设置窗口标志，使其始终显示在最上面
             self.screen_capture_window.show()
         
     def start_capture(self):
