@@ -5,9 +5,10 @@ import sys
 import shutil
 from PySide6.QtCore import QStandardPaths, QUrl, Signal
 from PySide6.QtGui import QFont, Qt, QDesktopServices, QColor
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QApplication, QWidget, QLabel, QComboBox, QPushButton, QFrame, QColorDialog, QFileDialog
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QApplication, QWidget, QLabel, QComboBox, QPushButton, QFrame, QColorDialog, QFileDialog, QMessageBox
 
 from config_handler import *
+from google_credentials import *
 
 
 # 创建一个新的类以用于设置窗口
@@ -15,7 +16,10 @@ class SettingsWindow(QDialog):
     # Create a custom signal for closed event
     setting_window_closed = Signal()
 
-    def __init__(self, config_handler: ConfigHandler):
+    # create a custom signal for update google credential state in main window
+    update_google_credential_state = Signal() 
+
+    def __init__(self, config_handler: ConfigHandler, google_credential: GoogleCloudClient):
         super().__init__()
 
         # set app's pwd
@@ -31,6 +35,9 @@ class SettingsWindow(QDialog):
 
         # 讀取 config file
         self.config_handler = config_handler
+
+        # import google credential module
+        self.google_credential = google_credential
 
         # # Set the window opacity
         self.setWindowOpacity(0.99)
@@ -459,6 +466,19 @@ class SettingsWindow(QDialog):
                     self.config_handler.set_google_credential_path(new_file_path)
                 except Exception as e:
                     pass
+                
+                # 檢查 google 憑證是否能正常使用
+                google_key_file_path = self.config_handler.get_google_credential_path()
+                self.google_credential.check_google_credential(google_key_file_path)
+
+                # create a messagebox to show the google credential state
+                if self.google_credential.get_google_vision() and self.google_credential.get_google_translation():
+                    QMessageBox.information(self, "Info", "已成功設置 Google 憑證 ! ")
+                else:
+                    QMessageBox.warning(self, "Warning", "設置 Google 憑證失敗！\n可能是該 Google 憑證無法使用 或 無法將該 Google 憑證檔案複製至應用程式資料夾底下作為使用！")
+
+                # send signal that make main windows update the google state
+                self.update_google_credential_state.emit()
 
     def closeEvent(self, event):
         self.setting_window_closed.emit()

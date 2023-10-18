@@ -20,22 +20,12 @@ from google.oauth2 import service_account
 
 from settings_windowsOS import *
 from config_handler import *
+from google_credentials import *
 
 
 # 設置 GCP 參數
 client_vision = None
 client_translate = None
-
-
-def set_google_vision():
-    global client_vision
-    # 初始化Google Cloud Vision API客戶端
-    client_vision = vision_v1.ImageAnnotatorClient() 
-
-def set_google_translation():
-    global client_translate
-    # 初始化Google Cloud Translation API客戶端
-    client_translate = translate.Client()   
 
 
 # create icon scale signal
@@ -129,7 +119,7 @@ class ScalableButton(QPushButton):
 
 
 class MainMenuWindow(QMainWindow):
-    def __init__(self, config_handler):
+    def __init__(self, config_handler: ConfigHandler, google_credential: GoogleCloudClient):
         global client_vision, client_translate
 
         if getattr(sys, 'frozen', False):
@@ -145,9 +135,12 @@ class MainMenuWindow(QMainWindow):
         # read config file
         self.config_handler = config_handler
 
+        # import google_credential module function
+        self.google_credential = google_credential
+
         # set private member
         self._frequency = ""
-        self._google_credentials = ""
+        # self._google_credentials = ""
 
         # 設置 capturing state 顯示計時器
         self.capturing_system_state_timer = QTimer(self)
@@ -155,7 +148,7 @@ class MainMenuWindow(QMainWindow):
         self.system_state_flag = True
 
         # Set the title
-        self.setWindowTitle("Main Control Windows")
+        self.setWindowTitle("Babel Tower")
 
         # Set the window background color to black
         main_window_palette = QPalette()
@@ -386,7 +379,7 @@ class MainMenuWindow(QMainWindow):
         self.google_credential_state.setStyleSheet("color: white;")  # 設置文字顏色為白色
 
         # 創建用於顯示 目前程式系統狀態 的 QLabel
-        self.system_state = QLabel("系統狀態： 已停止擷取", self)
+        self.system_state = QLabel("系統狀態： 尚未開啟擷取視窗", self)
         self.system_state.setAutoFillBackground(False)  # 设置背景颜色為透明
         self.system_state.setStyleSheet("color: white;")  # 設置文字顏色為白色
 
@@ -529,11 +522,22 @@ class MainMenuWindow(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.show_message_box)
 
-        # 設定Google Cloud金鑰環境變數
+        # 檢查是否為第一次使用 APP
         if self.config_handler.get_google_credential_path() != "":
+            # 設定Google Cloud金鑰環境變數
             google_key_file_path = self.config_handler.get_google_credential_path()
-            self.check_google_credential_state(google_key_file_path)
-            
+            # self.check_google_credential_state(google_key_file_path)
+            self.google_credential.check_google_credential(google_key_file_path)
+
+            if not self.update_google_credential_state():
+                # set only setting button enabled
+                for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button]:
+                    button.setEnabled(False)
+
+                # set timer for messagebox delayed show
+                self.timer = QTimer(self)
+                self.timer.timeout.connect(self.show_message_box)
+                self.delayed_show_message_box()
         else:      
             # set timer for messagebox delayed show
             self.timer = QTimer(self)
@@ -541,55 +545,32 @@ class MainMenuWindow(QMainWindow):
             self.delayed_show_message_box()
 
             # set only setting button enabled
-            for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button]:
-                button.setEnabled(False)
-
-            # 設置 google_credential_label
-            self.google_credential_state.setText("Google 憑證： <font color='red'>無設置憑證</font> ")
-
-
-    def check_google_credential_state(self, google_key_file_path):
-        if os.path.exists(google_key_file_path):
-            try:
-                credentials = service_account.Credentials.from_service_account_file(google_key_file_path)
-                # Create a client for Google Translation
-                client_translate = translate.Client(credentials=credentials)
-                translation = client_translate.translate('Hello', target_language='es')
-
-                # 設置 GCP credentials 和初始化 google.vision 和 google.translation 
-                os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = google_key_file_path
-                self._google_credentials = google_key_file_path
-                set_google_vision()
-                set_google_translation()
-
-                # 設置 google_credential_label
-                self.google_credential_state.setText("Google 憑證： <font color='green'>憑證有效</font> ")
-
-                # set all button enabled
-                for button in [self.add_window_button, self.action_button, self.pin_button, self.screenshot_button, self.clear_text_button, self.settings_button]:
-                    button.setEnabled(True)
-
-            except Exception as e:
-                # 設置 google_credential_label
-                self.google_credential_state.setText("Google 憑證： <font color='red'>憑證無效</font> ")
-
-                # set only setting button enabled
-                for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button]:
-                    button.setEnabled(False)
-                self.settings_button.setEnabled(True)
-        else:
-            # set timer for messagebox delayed show
-            self.timer = QTimer(self)
-            self.timer.timeout.connect(self.show_message_box)
-            self.delayed_show_message_box()
-
-            # 設置 google_credential_label
-            self.google_credential_state.setText("Google 憑證： <font color='red'>無設置憑證</font> ")
-
-            # set only setting button enabled
             for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button]:
                 button.setEnabled(False)
-            self.settings_button.setEnabled(True)
+            
+            # 設置 google_credential_label
+            self.google_credential_state.setText("Google 憑證： <font color='red'>尚未設置憑證</font> ")
+
+
+    def update_google_credential_state(self):
+        global client_vision, client_translate
+
+        # check google vision and google translation is setted or not
+        if self.google_credential.get_google_vision() and self.google_credential.get_google_translation():
+            client_vision = self.google_credential.get_google_vision()
+            client_translate = self.google_credential.get_google_translation()
+
+            # 設置 google_credential_label
+            message = self.google_credential.get_message()
+            self.google_credential_state.setText(message)
+
+            return True
+        else: 
+            # 設置 google_credential_label
+            message = self.google_credential.get_message()
+            self.google_credential_state.setText(message)
+
+            return False
 
     def delayed_show_message_box(self):
         # 启动定时器，延迟一定时间后显示消息框
@@ -658,6 +639,7 @@ class MainMenuWindow(QMainWindow):
         self.screenshot_timer.start(300)  # delay 0.3 seconds
 
     def capture_screenshot(self):
+
         # stop screenshot_timer
         self.screenshot_timer.stop()
 
@@ -785,7 +767,10 @@ class MainMenuWindow(QMainWindow):
         self.show()
         self.setDisabled(True)  # 禁用主窗口
 
-        self.settings_window = SettingsWindow(self.config_handler)
+        self.system_state.setText("系統狀態： 正在設定系統......")
+
+        self.settings_window = SettingsWindow(self.config_handler, self.google_credential)
+        self.settings_window.update_google_credential_state.connect(self.update_google_credential_state)
         self.settings_window.setting_window_closed.connect(self.set_main_and_capture_window_frame_window_back)
         self.settings_window.exec()
 
@@ -832,14 +817,17 @@ class MainMenuWindow(QMainWindow):
         # Update Frequency
         self._frequency = new_frequency
 
-    def update_google_credential(self, new_google_credential):
-        # Update google credential
-        self._google_credentials = new_google_credential
-        self.check_google_credential_state(self._google_credentials)
+    # def update_google_credential(self, new_google_credential):
+    #     # Update google credential
+    #     self._google_credentials = new_google_credential
+    #     self.check_google_credential_state(self._google_credentials)
 
     def add_or_check_screen_capture_window(self):
         # Check if a screen capture window is already open
         if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
+            # update system state
+            self.system_state.setText("系統狀態： 已開啟擷取視窗")
+
             # 将最小化的窗口恢复到正常状态
             self.screen_capture_window.setWindowFlags(Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint)  # 禁用最大化功能
             if self.is_pined:
@@ -859,6 +847,9 @@ class MainMenuWindow(QMainWindow):
             if self.is_pined:
                 self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint)  # 设置窗口标志，使其始终显示在最上面
             self.screen_capture_window.show()
+
+            # update system state
+            self.system_state.setText("系統狀態： 已開啟擷取視窗")
         
     def start_capture(self):
         if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
@@ -872,9 +863,8 @@ class MainMenuWindow(QMainWindow):
 
             self.screen_capture_window.start_capture()
 
-            self.add_window_button.setEnabled(False)
-            self.screenshot_button.setEnabled(False)
-            self.settings_button.setEnabled(False)
+            for button in [self.add_window_button, self.screenshot_button, self.pin_button, self.clear_text_button, self.settings_button]:
+                button.setEnabled(False)
 
             # 移除screen_capture_window的最上层标志
             self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint, False)
@@ -910,9 +900,8 @@ class MainMenuWindow(QMainWindow):
 
             self.screen_capture_window.stop_capture()
 
-            self.add_window_button.setEnabled(True)
-            self.screenshot_button.setEnabled(True)
-            self.settings_button.setEnabled(True)
+            for button in [self.add_window_button, self.screenshot_button, self.pin_button, self.clear_text_button, self.settings_button]:
+                button.setEnabled(True)
 
             # 恢复screen_capture_window的最上层标志
             self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint)
@@ -928,12 +917,17 @@ class MainMenuWindow(QMainWindow):
         self.update_text_font_color(text_font_color)
         self.update_recognition_frequency(frequency)
 
-        google_credential = self.config_handler.get_google_credential_path()
-        self.check_google_credential_state(google_credential)
+        self.system_state.setText("系統狀態：系統設定完成")
+
+        # google_credential = self.config_handler.get_google_credential_path()
+        # self.check_google_credential_state(google_credential)
 
     def handle_screen_capture_window_closed(self):
         # Slot to handle the screen capture window being closed
         self.screen_capture_window = None
+
+        # update system state
+        self.system_state.setText("系統狀態： 尚未開啟擷取視窗")
 
     def get_frequncy(self):
         return self._frequency
@@ -1007,6 +1001,11 @@ class ScreenCaptureWindow(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.capture_screen)
 
+
+    def showEvent(self, event):
+        # 在窗口显示后立馬调整边框位置
+        super().showEvent(event)
+        self.adjustBorderPosition()
 
     def resizeEvent(self, event):
         # 在窗口大小变化时调整边界线条的位置
@@ -1200,13 +1199,16 @@ if __name__ == "__main__":
     config_handler = ConfigHandler()
     config_handler.read_config_file()
 
+    # create a instance of google_credentials's class
+    google_credential = GoogleCloudClient()
+
     freeze_support()  # <----- add this
 
     # create pyside6 app
     App = QApplication(sys.argv)
 
     # Create the screen capture window and the main capturing control window
-    main_capturing_window = MainMenuWindow(config_handler)
+    main_capturing_window = MainMenuWindow(config_handler, google_credential)
 
     # 設置應用程序圖標
     if getattr(sys, 'frozen', False):
