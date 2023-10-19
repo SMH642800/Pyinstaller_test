@@ -4,8 +4,8 @@ import io
 import os
 import sys
 import cv2
+import mss
 import html
-import ctypes
 import numpy as np 
 import pygetwindow as gw
 from io import BytesIO
@@ -14,8 +14,8 @@ from multiprocessing import freeze_support  # <---add this
 from PySide6.QtGui import QPalette, QColor, QFontMetrics, QIcon, QPixmap
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QApplication, QPushButton, QHBoxLayout, QWidget, QScrollArea
 from PySide6.QtCore import Signal, QTimer, QSize, Property, QObject, QEasingCurve, QPropertyAnimation, Qt, Signal, Slot
-from google.cloud import vision_v1
-from google.cloud import translate_v2 as translate
+# from google.cloud import vision_v1
+# from google.cloud import translate_v2 as translate
 
 from settings_windowsOS import *
 from config_handler import *
@@ -120,9 +120,16 @@ class ScalableButton(QPushButton):
 class ScreenshotWindow(QMainWindow):
     mouse_release = Signal(int, int, int, int)
 
-    def __init__(self):
+    def __init__(self, main_window_screen):
         super().__init__()
+
+        # screen info
+        self.main_window_screen = main_window_screen
+        
+        # initial screenshot region window
         self.initUI()
+
+        # mouse event
         self.mouse_press_position = None
         self.mouse_tracking_position = None
         self.mouse_release_position = None
@@ -140,8 +147,11 @@ class ScreenshotWindow(QMainWindow):
         # Set the window opacity (0.7 in this example)
         self.setWindowOpacity(0.3)
         
+        # Use the stored screen for this window
+        self.move(self.main_window_screen.geometry().topLeft())
+
         # setting the geometry of window
-        screen_geometry = QApplication.primaryScreen().geometry()
+        screen_geometry = self.main_window_screen.geometry()
 
         # set x, y coordinate & width, height
         start_x_position = screen_geometry.left()
@@ -174,6 +184,28 @@ class ScreenshotWindow(QMainWindow):
         self.screenshot_region_frame.show()
         self.screenshot_region_frame.setGeometry(0, 0, 0, 0)
 
+        if getattr(sys, 'frozen', False):
+            # 应用程序被打包
+            app_dir = sys._MEIPASS
+        else:
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # take a whole screenshot first
+        app_window = gw.getWindowsWithTitle("Screenshot")
+        if app_window:
+            app_window = app_window[0]
+            # 取得視窗的位置和大小
+            left, top, right, bottom = app_window.left, app_window.top, app_window.right, app_window.bottom
+
+            # 使用 mss 擷取整個螢幕
+            with mss.mss() as sct:
+                for monitor in sct.monitors:
+                    if monitor['left'] == left and monitor['top'] == top and monitor['width'] == abs(left-right) and monitor['height'] == abs(top-bottom):
+                        sct_img = sct.grab(monitor)
+                        screenshot_path = os.path.join(app_dir, "screenshot.png")
+                        mss.tools.to_png(sct_img.rgb, sct_img.size, output=screenshot_path)
+                        break
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.mouse_press_position = event.pos()
@@ -193,9 +225,10 @@ class ScreenshotWindow(QMainWindow):
 
             # Emit the custom signal with coordinates
             if self.mouse_press_position and self.mouse_release_position:
-                # get the correct scale from user computer settings
-                scale_factor = (ctypes.windll.shcore.GetScaleFactorForDevice(0)) / 100
-                
+                # Get the screen where the screenshot window is displayed
+                screen = self.screen()
+                scale_factor = screen.devicePixelRatio()
+
                 # set the correct number after scale
                 x1, y1 = self.mouse_press_position.x()*scale_factor, self.mouse_press_position.y()*scale_factor
                 x2, y2 = self.mouse_release_position.x()*scale_factor, self.mouse_release_position.y()*scale_factor
@@ -231,6 +264,9 @@ class MainMenuWindow(QMainWindow):
         self.app_dir = app_dir
 
         super().__init__()
+
+        # set the screen that main window stay on
+        self.main_window_screen = None
 
         # read config file
         self.config_handler = config_handler
@@ -399,7 +435,7 @@ class MainMenuWindow(QMainWindow):
 
         # Create a button to clear label text
         # self.settings_button = QPushButton("", self)
-        new_file_path = os.path.join(self.app_dir, "img/ui/cleanup_button.")
+        new_file_path = os.path.join(self.app_dir, "img/ui/cleanup_button.png")
         self.clear_text_button = ScalableButton("clear_text_button", new_file_path)
         self.clear_text_button.setToolTip("清空文本")
         self.clear_text_button.setStyleSheet(
@@ -742,32 +778,30 @@ class MainMenuWindow(QMainWindow):
         # stop screenshot_timer
         self.screenshot_timer.stop()
 
-        # Get the main window's screen
-        main_window_screen = self.screen()
-        main_window_screen_geometry = main_window_screen.geometry()
+        # Get the main window's screen based on its current position
+        self.main_window_screen = QApplication.screenAt(self.mapToGlobal(self.rect().topLeft()))
 
-        self.screenshot_window = ScreenshotWindow()
-        # Connect the custom signal to a slot in MainWindow
-        self.screenshot_window.mouse_release.connect(self.capture_screenshot)
-        self.screenshot_window.move( main_window_screen_geometry.topLeft())  # Move to the same screen as the main window
-        self.screenshot_window.show()
+        if self.main_window_screen is not None:
+            self.screenshot_window = ScreenshotWindow(self.main_window_screen)
+            # Connect the custom signal to a slot in MainWindow
+            self.screenshot_window.mouse_release.connect(self.capture_screenshot)
+            self.screenshot_window.show()
 
     @Slot(int, int, int, int)
     def capture_screenshot(self, x1, y1, x2, y2):
         # get screenshot_path
         screenshot_path = os.path.join(self.app_dir, "screenshot.png")
 
-        # take the screenshot by imagegrab module
-        x, y, width, height = x1, y1, x2 - x1, y2 - y1
-        screenshot = ImageGrab.grab(bbox=(x, y, x + width, y + height))
-        screenshot.save(screenshot_path)
-
         self.restore_all_windows()
 
         if os.path.exists(screenshot_path):
             # 打开截图文件并转换为灰度图像
             with Image.open(screenshot_path) as img:
-                img_gray = img.convert("L")
+                # crop the image region
+                crop_box = (x1, y1, x2, y2)
+                cropped_img = img.crop(crop_box)
+
+                img_gray = cropped_img.convert("L")
                 img_bytes = BytesIO()
                 img_gray.save(img_bytes, format="PNG")
                 image_data = img_bytes.getvalue()
@@ -802,7 +836,7 @@ class MainMenuWindow(QMainWindow):
                 pass
 
             # delete screenshot image after ocr complete
-            os.remove(screenshot_path)
+            #os.remove(screenshot_path)
             # make sure main window show up (double check)
             #self.show()
 
@@ -951,8 +985,11 @@ class MainMenuWindow(QMainWindow):
 
             QMessageBox.warning(self, "Warning", "你已經開啟擷取視窗了!")
         else:
+            # Get the main window's screen based on its current position
+            self.main_window_screen = QApplication.screenAt(self.mapToGlobal(self.rect().topLeft()))
+
             # Create and show the screen capture window
-            self.screen_capture_window = ScreenCaptureWindow()
+            self.screen_capture_window = ScreenCaptureWindow(self.main_window_screen)
             self.screen_capture_window.closed.connect(self.handle_screen_capture_window_closed)
             self.screen_capture_window.setWindowFlags(Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint)  # 禁用最大化功能
             if self.is_pined:
@@ -968,6 +1005,8 @@ class MainMenuWindow(QMainWindow):
             new_file_path = os.path.join(self.app_dir, "img/ui/record_button_stop.png")
             self.action_button.createIcon(new_file_path)
             self.action_button.setToolTip("停止擷取畫面")
+
+            self.clear_label_text()
 
             self.action_button.clicked.disconnect()
             self.action_button.clicked.connect(self.stop_capture)
@@ -1054,7 +1093,7 @@ class ScreenCaptureWindow(QMainWindow):
     # Define a custom signal
     closed = Signal()
   
-    def __init__(self):
+    def __init__(self, main_window_screen):
 
         if getattr(sys, 'frozen', False):
             # 应用程序被打包
@@ -1065,6 +1104,9 @@ class ScreenCaptureWindow(QMainWindow):
         self.app_dir = app_dir
 
         super().__init__()
+
+        # screen info
+        self.main_window_screen = main_window_screen
 
         # 定義一個變數用來比較前一張已辨識的圖片
         self.previous_image = None
@@ -1084,7 +1126,10 @@ class ScreenCaptureWindow(QMainWindow):
         layout = QHBoxLayout()
   
         # setting the geometry of window
-        screen_geometry = QApplication.primaryScreen().geometry()
+        self.move(self.main_window_screen.geometry().topLeft())
+
+        # setting the geometry of window
+        screen_geometry = self.main_window_screen.geometry()
 
         # set x, y coordinate & width, height
         start_x_position = screen_geometry.left() + screen_geometry.width() // 4
@@ -1172,11 +1217,47 @@ class ScreenCaptureWindow(QMainWindow):
         global capture_start
 
         if self.isVisible():
-            window = gw.getWindowsWithTitle("擷取視窗")[0]
-            title_bar_height = 30
+            # Get the screen where the screenshot window is displayed
+            screen = self.screen()
+            # get the ration of screen settings in windows system
+            scale_factor = screen.devicePixelRatio()
+            x1 = self.geometry().x()*scale_factor
+            y1 = self.geometry().y()*scale_factor
+            x2 = self.geometry().x()*scale_factor + self.geometry().width()*scale_factor
+            y2 = self.geometry().y()*scale_factor + self.geometry().height()*scale_factor
+            
+            # use mss module to get the display of screen_capture_window which stayed on
+            app_window = gw.getWindowsWithTitle("擷取視窗")
+            if app_window:
+                app_window = app_window[0]
+                # 取得視窗的位置和大小
+                left, top, right, bottom = app_window.left, app_window.top, app_window.right, app_window.bottom
 
-            x, y, width, height = window.left, window.top+title_bar_height, window.width, window.height-title_bar_height
-            screenshot = ImageGrab.grab(bbox=(x, y, x+width, y+height))
+                # 创建标志变量
+                found_monitor = False
+                # 使用 mss 擷取整個螢幕
+                with mss.mss() as sct:
+                    for monitor in sct.monitors[1:]:
+                        if monitor['left'] < left and monitor['top'] < top:
+                            distance_x, distance_y = left-monitor['left'], top-monitor['top']
+                            if distance_x <= monitor['width'] and distance_y <= monitor['height']:
+                                # modify the correct cropped coordinate
+                                monitor_modify_width = (0.0 - monitor['left'])
+                                monitor_modify_height = (0.0 - monitor['top'])
+
+                                sct_img = sct.grab(monitor)
+
+                                # Create the PIL Image
+                                pil_img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
+
+                                # crop the region
+                                screenshot = pil_img.crop((x1 + monitor_modify_width, y1 + monitor_modify_height, x2 + monitor_modify_width, y2 + monitor_modify_height))
+                                found_monitor = True                                
+                                break
+                        if found_monitor:
+                            break
+
+            # screenshot = ImageGrab.grab(bbox=(x, y, x+width, y+height))
             
             # 在每次执行 OCR 之前比较图像相似度
             if self.is_similar_to_previous(screenshot):
