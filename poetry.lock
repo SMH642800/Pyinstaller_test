@@ -355,6 +355,17 @@ files = [
 altgraph = ">=0.17"
 
 [[package]]
+name = "mss"
+version = "9.0.1"
+description = "An ultra fast cross-platform multiple screenshots module in pure python using ctypes."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "mss-9.0.1-py3-none-any.whl", hash = "sha256:7ee44db7ab14cbea6a3eb63813c57d677a109ca5979d3b76046e4bddd3ca1a0b"},
+    {file = "mss-9.0.1.tar.gz", hash = "sha256:6eb7b9008cf27428811fa33aeb35f3334db81e3f7cc2dd49ec7c6e5a94b39f12"},
+]
+
+[[package]]
 name = "numpy"
 version = "1.26.0"
 description = "Fundamental package for array computing in Python"
@@ -791,4 +802,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.11"
-content-hash = "502dc1c353381bbfb3275ebf93ee513e474cb6ebce65d3eda5a3f5b9b10e0f20"
+content-hash = "77a5b464aa17a9a860eb89c00b8095730693da308af4774244eed5a396ade002"

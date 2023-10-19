@@ -3,7 +3,6 @@
 import os
 import sys
 import toml
-import getpass
 
 
 class ConfigHandler():

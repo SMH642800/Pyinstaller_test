@@ -836,7 +836,7 @@ class MainMenuWindow(QMainWindow):
                 pass
 
             # delete screenshot image after ocr complete
-            #os.remove(screenshot_path)
+            os.remove(screenshot_path)
             # make sure main window show up (double check)
             #self.show()
 
