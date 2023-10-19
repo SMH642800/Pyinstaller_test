@@ -5,7 +5,7 @@ import os
 import sys
 import cv2
 import html
-import subprocess
+import ctypes
 import numpy as np 
 import pygetwindow as gw
 from io import BytesIO
@@ -13,10 +13,9 @@ from PIL import Image,ImageGrab
 from multiprocessing import freeze_support  # <---add this
 from PySide6.QtGui import QPalette, QColor, QFontMetrics, QIcon, QPixmap
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QApplication, QPushButton, QHBoxLayout, QWidget, QScrollArea
-from PySide6.QtCore import Signal, QTimer, QSize, Property, QObject, QEasingCurve, QPropertyAnimation, QProcess
+from PySide6.QtCore import Signal, QTimer, QSize, Property, QObject, QEasingCurve, QPropertyAnimation, Qt, Signal, Slot
 from google.cloud import vision_v1
 from google.cloud import translate_v2 as translate
-from google.oauth2 import service_account
 
 from settings_windowsOS import *
 from config_handler import *
@@ -116,6 +115,107 @@ class ScalableButton(QPushButton):
 
     def updateIconSize(self, size):
         self.setIconSize(size)
+
+
+class ScreenshotWindow(QMainWindow):
+    mouse_release = Signal(int, int, int, int)
+
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+        self.mouse_press_position = None
+        self.mouse_tracking_position = None
+        self.mouse_release_position = None
+        self.mouse_is_pressed = False
+
+    def initUI(self):
+        self.setWindowTitle("Screenshot")
+        self.setWindowFlags(Qt.FramelessWindowHint)
+
+        # Set the window background color to black
+        capture_window_palette = QPalette()
+        capture_window_palette.setColor(QPalette.Window, QColor(0, 0, 0))
+        self.setPalette(capture_window_palette)
+
+        # Set the window opacity (0.7 in this example)
+        self.setWindowOpacity(0.3)
+        
+        # setting the geometry of window
+        screen_geometry = QApplication.primaryScreen().geometry()
+
+        # set x, y coordinate & width, height
+        start_x_position = screen_geometry.left()
+        start_y_position = screen_geometry.top()
+        screen_width = screen_geometry.width()
+        screen_height = screen_geometry.height()
+        self.setGeometry(start_x_position, start_y_position, screen_width, screen_height)
+
+        self.setCursor(Qt.CrossCursor)
+
+        # plot the border of the window
+        self.screenshot_region_frame = QFrame(self)
+        self.screenshot_region_frame.setStyleSheet('QFrame {background-color:  rgba(200, 200, 200, 150); }')
+        self.screenshot_region_frame.hide()
+
+        # 创建一个水平布局管理器
+        layout = QHBoxLayout()
+
+        # 将边界线条添加到布局管理器
+        layout.addWidget(self.screenshot_region_frame)
+
+        # 创建一个 widget 以容纳布局管理器
+        container_widget = QWidget(self)
+        container_widget.setLayout(layout)
+
+        # 将 widget 设置为主窗口的中心部件
+        self.setCentralWidget(container_widget)
+
+    def set_frame_to_disapper(self):
+        self.screenshot_region_frame.show()
+        self.screenshot_region_frame.setGeometry(0, 0, 0, 0)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.mouse_press_position = event.pos()
+            self.mouse_is_pressed = True
+            # print(f"Mouse Click at: ({self.mouse_press_position.x()}, {self.mouse_press_position.y()})")
+            
+            # show the paint frame and set it to invisible at first
+            self.set_frame_to_disapper()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.mouse_release_position = event.pos()
+            self.setCursor(Qt.ArrowCursor)  # 恢復滑鼠游標
+            self.mouse_is_pressed = False
+            self.close()
+            # print(f"Mouse Released at: ({self.mouse_release_position.x()}, {self.mouse_release_position.y()})")
+
+            # Emit the custom signal with coordinates
+            if self.mouse_press_position and self.mouse_release_position:
+                # get the correct scale from user computer settings
+                scale_factor = (ctypes.windll.shcore.GetScaleFactorForDevice(0)) / 100
+                
+                # set the correct number after scale
+                x1, y1 = self.mouse_press_position.x()*scale_factor, self.mouse_press_position.y()*scale_factor
+                x2, y2 = self.mouse_release_position.x()*scale_factor, self.mouse_release_position.y()*scale_factor
+                self.mouse_release.emit(x1, y1, x2, y2)  # Emit the signal
+
+    def mouseMoveEvent(self, event):
+        if self.mouse_is_pressed:
+            self.mouse_tracking_position = event.pos()
+            # print(f"Mouse Moved to: ({self.mouse_tracking_position.x()}, {self.mouse_tracking_position.y()})")
+            self.plot_screenshot_region()
+
+    def plot_screenshot_region(self):
+        if self.mouse_press_position and self.mouse_tracking_position:
+            x = min(self.mouse_press_position.x(), self.mouse_tracking_position.x())
+            y = min(self.mouse_press_position.y(), self.mouse_tracking_position.y())
+            width = abs(self.mouse_tracking_position.x() - self.mouse_press_position.x())
+            height = abs(self.mouse_tracking_position.y() - self.mouse_press_position.y()) 
+
+            # 调整边界线条的位置
+            self.screenshot_region_frame.setGeometry(x, y, width, height)
 
 
 class MainMenuWindow(QMainWindow):
@@ -265,7 +365,7 @@ class MainMenuWindow(QMainWindow):
 
         # set timer for delay process the capture_screenshot function
         self.screenshot_timer = QTimer(self)
-        self.screenshot_timer.timeout.connect(self.capture_screenshot)
+        self.screenshot_timer.timeout.connect(self.show_screenshot_window)
         self.screenshot_button.clicked.connect(self.delayed_process_screenshot_function)
 
         # Create a button to pin the window on the toppest
@@ -299,7 +399,7 @@ class MainMenuWindow(QMainWindow):
 
         # Create a button to clear label text
         # self.settings_button = QPushButton("", self)
-        new_file_path = os.path.join(self.app_dir, "img/ui/delete_button.svg")
+        new_file_path = os.path.join(self.app_dir, "img/ui/cleanup_button.")
         self.clear_text_button = ScalableButton("clear_text_button", new_file_path)
         self.clear_text_button.setToolTip("清空文本")
         self.clear_text_button.setStyleSheet(
@@ -638,17 +738,28 @@ class MainMenuWindow(QMainWindow):
         # start timer to delay process the screenshot function
         self.screenshot_timer.start(300)  # delay 0.3 seconds
 
-    def capture_screenshot(self):
-
+    def show_screenshot_window(self):
         # stop screenshot_timer
         self.screenshot_timer.stop()
 
+        # Get the main window's screen
+        main_window_screen = self.screen()
+        main_window_screen_geometry = main_window_screen.geometry()
+
+        self.screenshot_window = ScreenshotWindow()
+        # Connect the custom signal to a slot in MainWindow
+        self.screenshot_window.mouse_release.connect(self.capture_screenshot)
+        self.screenshot_window.move( main_window_screen_geometry.topLeft())  # Move to the same screen as the main window
+        self.screenshot_window.show()
+
+    @Slot(int, int, int, int)
+    def capture_screenshot(self, x1, y1, x2, y2):
         # get screenshot_path
         screenshot_path = os.path.join(self.app_dir, "screenshot.png")
 
-        # 調用 Snipping Tool 並將 screenshot 從 clipboard 上抓取並儲存起來
-        subprocess.run(["snippingtool.exe"])
-        screenshot = ImageGrab.grabclipboard()
+        # take the screenshot by imagegrab module
+        x, y, width, height = x1, y1, x2 - x1, y2 - y1
+        screenshot = ImageGrab.grab(bbox=(x, y, x + width, y + height))
         screenshot.save(screenshot_path)
 
         self.restore_all_windows()
@@ -972,7 +1083,7 @@ class ScreenCaptureWindow(QMainWindow):
         # 创建一个水平布局管理器
         layout = QHBoxLayout()
   
-        # setting  the geometry of window
+        # setting the geometry of window
         screen_geometry = QApplication.primaryScreen().geometry()
 
         # set x, y coordinate & width, height
