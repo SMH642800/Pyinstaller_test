@@ -915,6 +915,11 @@ class MainMenuWindow(QMainWindow):
         self.system_state.setText("系統狀態： 正在設定系統......")
 
         self.settings_window = SettingsWindow(self.config_handler, self.google_credential)
+
+        # set icon for settings dialog
+        ico_path = os.path.join(self.app_dir, "img\\icon\\settings_icon.png")
+        self.settings_window.setWindowIcon(QIcon(ico_path))
+
         self.settings_window.update_google_credential_state.connect(self.update_google_credential_state)
         self.settings_window.setting_window_closed.connect(self.set_main_and_capture_window_frame_window_back)
         self.settings_window.exec()
@@ -990,6 +995,11 @@ class MainMenuWindow(QMainWindow):
 
             # Create and show the screen capture window
             self.screen_capture_window = ScreenCaptureWindow(self.main_window_screen)
+
+            # set icon for screen capture window
+            ico_path = os.path.join(self.app_dir, "img\\icon\\capture_icon.png")
+            self.screen_capture_window.setWindowIcon(QIcon(ico_path))
+
             self.screen_capture_window.closed.connect(self.handle_screen_capture_window_closed)
             self.screen_capture_window.setWindowFlags(Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint)  # 禁用最大化功能
             if self.is_pined:
