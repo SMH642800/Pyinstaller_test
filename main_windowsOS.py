@@ -5,6 +5,7 @@ import os
 import sys
 import cv2
 import mss
+import mss.tools
 import html
 import numpy as np 
 import pygetwindow as gw
@@ -20,6 +21,8 @@ from PySide6.QtCore import Signal, QTimer, QSize, Property, QObject, QEasingCurv
 from settings_windowsOS import *
 from config_handler import *
 from google_credentials import *
+
+import time
 
 
 # 設置 GCP 參數
@@ -123,6 +126,12 @@ class ScreenshotWindow(QMainWindow):
     def __init__(self, main_window_screen):
         super().__init__()
 
+        if getattr(sys, 'frozen', False):
+            # 应用程序被打包
+            self.app_dir = sys._MEIPASS
+        else:
+            self.app_dir = os.path.dirname(os.path.abspath(__file__))
+
         # screen info
         self.main_window_screen = main_window_screen
         
@@ -145,7 +154,7 @@ class ScreenshotWindow(QMainWindow):
         self.setPalette(capture_window_palette)
 
         # Set the window opacity (0.7 in this example)
-        self.setWindowOpacity(0.3)
+        self.setWindowOpacity(0.4)
         
         # Use the stored screen for this window
         self.move(self.main_window_screen.geometry().topLeft())
@@ -164,7 +173,7 @@ class ScreenshotWindow(QMainWindow):
 
         # plot the border of the window
         self.screenshot_region_frame = QFrame(self)
-        self.screenshot_region_frame.setStyleSheet('QFrame {background-color:  rgba(200, 200, 200, 150); }')
+        self.screenshot_region_frame.setStyleSheet('QFrame {background-color:  rgba(180, 180, 180, 150); }')
         self.screenshot_region_frame.hide()
 
         # 创建一个水平布局管理器
@@ -184,12 +193,6 @@ class ScreenshotWindow(QMainWindow):
         self.screenshot_region_frame.show()
         self.screenshot_region_frame.setGeometry(0, 0, 0, 0)
 
-        if getattr(sys, 'frozen', False):
-            # 应用程序被打包
-            app_dir = sys._MEIPASS
-        else:
-            app_dir = os.path.dirname(os.path.abspath(__file__))
-
         # take a whole screenshot first
         app_window = gw.getWindowsWithTitle("Screenshot")
         if app_window:
@@ -202,9 +205,18 @@ class ScreenshotWindow(QMainWindow):
                 for monitor in sct.monitors:
                     if monitor['left'] == left and monitor['top'] == top and monitor['width'] == abs(left-right) and monitor['height'] == abs(top-bottom):
                         sct_img = sct.grab(monitor)
-                        screenshot_path = os.path.join(app_dir, "screenshot.png")
+                        screenshot_path = os.path.join(self.app_dir, "screenshot.png")
                         mss.tools.to_png(sct_img.rgb, sct_img.size, output=screenshot_path)
                         break
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            screenshot_path = os.path.join(self.app_dir, "screenshot.png")
+            if os.path.exists(screenshot_path):
+                os.remove(screenshot_path)
+            self.mouse_release.emit(0, 0, 0, 0)  # Emit the signal
+            self.close()
+            event.ignore()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -1231,43 +1243,50 @@ class ScreenCaptureWindow(QMainWindow):
             screen = self.screen()
             # get the ration of screen settings in windows system
             scale_factor = screen.devicePixelRatio()
-            x1 = self.geometry().x()*scale_factor
-            y1 = self.geometry().y()*scale_factor
-            x2 = self.geometry().x()*scale_factor + self.geometry().width()*scale_factor
-            y2 = self.geometry().y()*scale_factor + self.geometry().height()*scale_factor
+
+            x1 = self.geometry().x()
+            y1 = self.geometry().y()
+            x2 = self.geometry().x() + self.geometry().width()
+            y2 = self.geometry().y() + self.geometry().height()
             
             # use mss module to get the display of screen_capture_window which stayed on
             app_window = gw.getWindowsWithTitle("擷取視窗")
             if app_window:
                 app_window = app_window[0]
                 # 取得視窗的位置和大小
-                left, top, right, bottom = app_window.left, app_window.top, app_window.right, app_window.bottom
+                left, top = app_window.left, app_window.top
 
                 # 创建标志变量
                 found_monitor = False
                 # 使用 mss 擷取整個螢幕
                 with mss.mss() as sct:
+                    # method 1: found specific display
                     for monitor in sct.monitors[1:]:
                         if monitor['left'] < left and monitor['top'] < top:
                             distance_x, distance_y = left-monitor['left'], top-monitor['top']
                             if distance_x <= monitor['width'] and distance_y <= monitor['height']:
                                 # modify the correct cropped coordinate
-                                monitor_modify_width = (0.0 - monitor['left'])
-                                monitor_modify_height = (0.0 - monitor['top'])
+                                monitor_modify_x = (0.0 - monitor['left'])
+                                monitor_modify_y = (0.0 - monitor['top'])
 
+                                # modify right cropped coordinate
+                                x1 = (x1 + monitor_modify_x)*scale_factor
+                                y1 = (y1 + monitor_modify_y)*scale_factor
+                                x2 = (x2 + monitor_modify_x)*scale_factor
+                                y2 = (y2 + monitor_modify_y)*scale_factor
+
+                                # use mss module to grab whole region of monitor first
                                 sct_img = sct.grab(monitor)
 
                                 # Create the PIL Image
                                 pil_img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
 
                                 # crop the region
-                                screenshot = pil_img.crop((x1 + monitor_modify_width, y1 + monitor_modify_height, x2 + monitor_modify_width, y2 + monitor_modify_height))
+                                screenshot = pil_img.crop((x1, y1, x2, y2))
                                 found_monitor = True                                
                                 break
                         if found_monitor:
                             break
-
-            # screenshot = ImageGrab.grab(bbox=(x, y, x+width, y+height))
             
             # 在每次执行 OCR 之前比较图像相似度
             if self.is_similar_to_previous(screenshot):
