@@ -1268,9 +1268,9 @@ class ScreenCaptureWindow(QMainWindow):
                         distance = abs(left - monitor['left'])
                         over_border_distance_list[distance] = monitor
 
-                        if monitor['left'] < left and monitor['top'] < top:
+                        if monitor['left'] < left and monitor['top'] <= top:
                             distance_x, distance_y = left-monitor['left'], top-monitor['top']
-                            if distance_x <= monitor['width'] and distance_y <= monitor['height']:
+                            if distance_x < monitor['width'] and distance_y < monitor['height']:
                                 # modify the correct cropped coordinate
                                 monitor_modify_x = (0.0 - monitor['left'])
                                 monitor_modify_y = (0.0 - monitor['top'])
@@ -1310,10 +1310,8 @@ class ScreenCaptureWindow(QMainWindow):
                         x2 = (x2 + monitor_modify_x)*scale_factor
                         y2 = (y2 + monitor_modify_y)*scale_factor
 
-                        print(x1, y1, x2, y2)
-
                         # use mss module to grab whole region of monitor first
-                        sct_img = sct.grab(monitor)
+                        sct_img = sct.grab(closest_monitor)
 
                         # Create the PIL Image
                         pil_img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
