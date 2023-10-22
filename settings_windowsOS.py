@@ -272,17 +272,34 @@ class SettingsWindow(QDialog):
         # 创建一个用于系統设置的 QWidget
         system_settings = QWidget()
 
-        # set font size to 14px
-        font = QFont()
-        font.setPointSize(12)
-        font.setBold(True) # 設置粗體
+        # set button_font size to 12px
+        button_font = QFont()
+        button_font.setPointSize(12)
+        button_font.setBold(True) # 設置粗體
+
+        # set label_font size to 10px
+        label_font = QFont()
+        label_font.setPointSize(10)
+        label_font.setBold(True) # 設置粗體
 
         # 创建一个按钮以设置 Google 凭证
-        set_credentials_button = QPushButton("設定 Google 憑證")
-        set_credentials_button.setFont(font)
-        set_credentials_button.clicked.connect(self.set_google_credentials)
+        self.set_credentials_button = QPushButton("")
+
+        # 設置 google 憑證 button 的顯示文字
+        successed_message = "憑證有效"
+        failed_message = "憑證無效"
+        not_set_message = "尚未設置憑證"
+        if successed_message in self.google_credential.get_message():
+            self.set_credentials_button.setText("更新 Google 憑證")
+        if failed_message in self.google_credential.get_message():
+            self.set_credentials_button.setText("更新 Google 憑證")
+        if not_set_message in self.google_credential.get_message():
+            self.set_credentials_button.setText("設定 Google 憑證")
+
+        self.set_credentials_button.setFont(button_font)
+        self.set_credentials_button.clicked.connect(self.set_google_credentials)
         # 使用样式表自定义按钮的外观
-        set_credentials_button.setStyleSheet(
+        self.set_credentials_button.setStyleSheet(
             "QPushButton {"
             "    background-color: rgba(0, 0, 0, 0);"
             "    color: rgb(58, 134, 255);"
@@ -302,6 +319,21 @@ class SettingsWindow(QDialog):
             "}"
         )
 
+        # create a label to show google_credential state
+        self.google_credential_state = QLabel("")
+        self.google_credential_state.setFont(label_font)
+        self.google_credential_state.setStyleSheet(
+            "QLabel { qproperty-alignment: AlignCenter; } "  # 文字置中
+        )
+
+        # check google_credential can use or not
+        google_key_file_path = self.config_handler.get_google_credential_path()
+        self.google_credential.check_google_credential(google_key_file_path)
+
+        # set the text with return message from check_google_credential
+        message = self.google_credential.get_message()
+        self.google_credential_state.setText(message)
+
         # 創建如何取得google憑證連結
         new_file_path = os.path.join(self.app_dir_path, "sub-google-api.html")
         self.credentials_link = QLabel(f'<a href="file://{new_file_path}">如何取得 Google 憑證？</a>')
@@ -315,7 +347,8 @@ class SettingsWindow(QDialog):
         # 将小部件添加到系統设置布局
         layout = QVBoxLayout()
         layout.addSpacing(15)  # 添加一个占位符来距离左边至少 10px
-        layout.addWidget(set_credentials_button)
+        layout.addWidget(self.set_credentials_button)
+        layout.addWidget(self.google_credential_state)
         layout.addWidget(self.credentials_link)
         layout.addSpacing(15)  # 添加一个占位符来距离左边至少 10px
         system_settings.setLayout(layout)
@@ -336,7 +369,7 @@ class SettingsWindow(QDialog):
         label_font.setBold(True) # 設置粗體
 
         # 建立版本訊息、作者名稱
-        version_label = QLabel("版本: ver1.0")
+        version_label = QLabel("版本: ver0.1.0")
         author_label = QLabel("作者: Hsieh Meng-Hao")
 
         # 創建使用說明連結、Github連結
@@ -474,11 +507,29 @@ class SettingsWindow(QDialog):
                 # create a messagebox to show the google credential state
                 if self.google_credential.get_google_vision() and self.google_credential.get_google_translation():
                     QMessageBox.information(self, "Info", "已成功設置 Google 憑證 ! ")
+
+                    # 更新設置 google 憑證 button 的文字
+                    self.set_credentials_button.setText("更新 Google 憑證")
+
+                    # 更新 google 憑證狀態的文字
+                    message = self.google_credential.get_message()
+                    self.google_credential_state.setText(message)
                 else:
                     QMessageBox.warning(self, "Warning", "設置 Google 憑證失敗！\n可能是該 Google 憑證無法使用 或 無法將該 Google 憑證檔案複製至應用程式資料夾底下作為使用！")
 
+                    # 更新 google 憑證狀態的文字
+                    message = self.google_credential.get_message()
+                    self.google_credential_state.setText(message)
+
+                    not_set_message = "尚未設置憑證"
+                    if not_set_message in message:
+                        self.set_credentials_button.setText("設定 Google 憑證")
+                    else:
+                        self.set_credentials_button.setText("更新 Google 憑證")
+
                 # send signal that make main windows update the google state
                 self.update_google_credential_state.emit()
+
 
     def closeEvent(self, event):
         self.setting_window_closed.emit()

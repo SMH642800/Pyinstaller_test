@@ -291,9 +291,9 @@ class MainMenuWindow(QMainWindow):
         # self._google_credentials = ""
 
         # 設置 capturing state 顯示計時器
-        self.capturing_system_state_timer = QTimer(self)
-        self.capturing_system_state_timer.timeout.connect(self.update_system_state)
-        self.system_state_flag = True
+        # self.capturing_system_state_timer = QTimer(self)
+        # self.capturing_system_state_timer.timeout.connect(self.update_system_state)
+        # self.system_state_flag = True
 
         # Set the title
         self.setWindowTitle("Babel Tower")
@@ -522,14 +522,14 @@ class MainMenuWindow(QMainWindow):
         # self.settings_button.setStyleSheet('QPushButton {background-color: white; color: red;}')
 
         # 創建用於顯示 google credential憑證狀態 的 QLabel
-        self.google_credential_state = QLabel("Google 憑證：", self)
-        self.google_credential_state.setAutoFillBackground(False)  # 设置背景颜色為透明
-        self.google_credential_state.setStyleSheet("color: white;")  # 設置文字顏色為白色
+        # self.google_credential_state = QLabel("Google 憑證：", self)
+        # self.google_credential_state.setAutoFillBackground(False)  # 设置背景颜色為透明
+        # self.google_credential_state.setStyleSheet("color: white;")  # 設置文字顏色為白色
 
         # 創建用於顯示 目前程式系統狀態 的 QLabel
-        self.system_state = QLabel("系統狀態： 尚未開啟擷取視窗", self)
-        self.system_state.setAutoFillBackground(False)  # 设置背景颜色為透明
-        self.system_state.setStyleSheet("color: white;")  # 設置文字顏色為白色
+        # self.system_state = QLabel("系統狀態： 尚未開啟擷取視窗", self)
+        # self.system_state.setAutoFillBackground(False)  # 设置背景颜色為透明
+        # self.system_state.setStyleSheet("color: white;")  # 設置文字顏色為白色
 
         # 創建一條水平線以隔開 label
         self.line = QFrame()
@@ -590,8 +590,8 @@ class MainMenuWindow(QMainWindow):
         state_font = QFont()
         state_font.setPointSize(10)
         state_font.setBold(True) # 設置粗體
-        self.google_credential_state.setFont(state_font)
-        self.system_state.setFont(state_font)
+        # self.google_credential_state.setFont(state_font)
+        # self.system_state.setFont(state_font)
 
         # Calculate the height based on font size
         # Set the height of ocr_label, translation_label, google_credential_state, system_state to match font size
@@ -601,8 +601,8 @@ class MainMenuWindow(QMainWindow):
         state_label_height = state_font_metrics.height()
         self.ocr_label.setFixedHeight(label_height)
         self.translation_label.setFixedHeight(label_height)
-        self.google_credential_state.setFixedHeight(state_label_height)
-        self.system_state.setFixedHeight(state_label_height)
+        # self.google_credential_state.setFixedHeight(state_label_height)
+        # self.system_state.setFixedHeight(state_label_height)
 
         # 创建一个QPalette对象来设置 OCR_result_text 的背景及文字颜色
         # self.text_label_palette = QPalette()
@@ -634,13 +634,13 @@ class MainMenuWindow(QMainWindow):
         button_layout.addWidget(self.settings_button)
 
         # Create a horizontal layout for google_credential_state, system_state
-        system_state_layout = QHBoxLayout()
-        system_state_layout.addWidget(self.google_credential_state)
-        system_state_layout.addWidget(self.system_state)
+        # system_state_layout = QHBoxLayout()
+        # system_state_layout.addWidget(self.google_credential_state)
+        # system_state_layout.addWidget(self.system_state)
 
         # Add the horizontal button layout and system state layout to the vertical layout
         layout.addLayout(button_layout)
-        layout.addLayout(system_state_layout)
+        # layout.addLayout(system_state_layout)
 
         # Add the horizontal line to the vertical layout to seperate the system_state_layout and ocr_label
         layout.addWidget(self.line)
@@ -678,10 +678,6 @@ class MainMenuWindow(QMainWindow):
             self.google_credential.check_google_credential(google_key_file_path)
 
             if not self.update_google_credential_state():
-                # set only setting button enabled
-                for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button]:
-                    button.setEnabled(False)
-
                 # set timer for messagebox delayed show
                 self.timer = QTimer(self)
                 self.timer.timeout.connect(self.show_message_box)
@@ -709,14 +705,21 @@ class MainMenuWindow(QMainWindow):
             client_translate = self.google_credential.get_google_translation()
 
             # 設置 google_credential_label
-            message = self.google_credential.get_message()
-            self.google_credential_state.setText(message)
+            # message = self.google_credential.get_message()
+            # self.google_credential_state.setText(message)
+
+            for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button]:
+                button.setEnabled(True)
 
             return True
         else: 
             # 設置 google_credential_label
-            message = self.google_credential.get_message()
-            self.google_credential_state.setText(message)
+            # message = self.google_credential.get_message()
+            # self.google_credential_state.setText(message)
+            # set only setting button enabled
+
+            for button in [self.add_window_button, self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button]:
+                button.setEnabled(False)
 
             return False
 
@@ -924,7 +927,7 @@ class MainMenuWindow(QMainWindow):
         self.show()
         self.setDisabled(True)  # 禁用主窗口
 
-        self.system_state.setText("系統狀態： 正在設定系統......")
+        # self.system_state.setText("系統狀態： 正在設定系統......")
 
         self.settings_window = SettingsWindow(self.config_handler, self.google_credential)
 
@@ -988,7 +991,7 @@ class MainMenuWindow(QMainWindow):
         # Check if a screen capture window is already open
         if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
             # update system state
-            self.system_state.setText("系統狀態： 已開啟擷取視窗")
+            # self.system_state.setText("系統狀態： 已開啟擷取視窗")
 
             # 将最小化的窗口恢复到正常状态
             self.screen_capture_window.setWindowFlags(Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint)  # 禁用最大化功能
@@ -1018,8 +1021,27 @@ class MainMenuWindow(QMainWindow):
                 self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint)  # 设置窗口标志，使其始终显示在最上面
             self.screen_capture_window.show()
 
+            self.add_window_button.setStyleSheet(
+                "QPushButton {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #488EF7, stop: 1 #3478F6);"
+                "    color: rgb(58, 134, 255);"
+                #"    border: 2px solid rgb(58, 134, 255);"
+                "    border-radius: 8px;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #488EF7, stop: 1 #3478F6);"
+                "    border: none;"
+                "    color: white;"
+                "}"
+                "QPushButton:pressed {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+                "    border: none;"
+                "    color: white;"
+                "}"
+            )
+
             # update system state
-            self.system_state.setText("系統狀態： 已開啟擷取視窗")
+            # self.system_state.setText("系統狀態： 已開啟擷取視窗")
         
     def start_capture(self):
         if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
@@ -1027,6 +1049,24 @@ class MainMenuWindow(QMainWindow):
             new_file_path = os.path.join(self.app_dir, "img/ui/record_button_stop.png")
             self.action_button.createIcon(new_file_path)
             self.action_button.setToolTip("停止擷取畫面")
+            self.action_button.setStyleSheet(
+                "QPushButton {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #EB6777, stop: 1 #E63F46);"
+                # "    color: rgb(58, 134, 255);"
+                #"    border: 2px solid rgb(58, 134, 255);"
+                "    border-radius: 8px;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #EB6777, stop: 1 #E63F46);"
+                "    border: none;"
+                "    color: white;"
+                "}"
+                "QPushButton:pressed {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6E2C35, stop: 1 #6D181A);"
+                "    border: none;"
+                "    color: white;"
+                "}"
+            )
 
             self.clear_label_text()
 
@@ -1043,29 +1083,48 @@ class MainMenuWindow(QMainWindow):
             self.screen_capture_window.show()
 
             # 設置 system_state_label: capturing
-            self.update_system_state()
-            self.capturing_system_state_timer.start(1000) # 每 1 秒更新一次 system_state_label 顯示狀態
+            # self.update_system_state()
+            # self.capturing_system_state_timer.start(1000) # 每 1 秒更新一次 system_state_label 顯示狀態
         else:
             # 创建消息框
             QMessageBox.warning(self, "Warning", "你尚未開啟擷取視窗!")
 
-    def update_system_state(self):
-        if self.system_state_flag:
-            self.system_state.setText("系統狀態： <font color='red'>&nbsp;&nbsp;●&nbsp;擷取中</font> ")
-        else:
-            self.system_state.setText("系統狀態： <font color='red'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;擷取中</font> ")
-        self.system_state_flag = not self.system_state_flag  # 讓下一次顯示另一種狀態
+    # def update_system_state(self):
+    #     if self.system_state_flag:
+    #         self.system_state.setText("系統狀態： <font color='red'>&nbsp;&nbsp;●&nbsp;擷取中</font> ")
+    #     else:
+    #         self.system_state.setText("系統狀態： <font color='red'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;擷取中</font> ")
+    #     self.system_state_flag = not self.system_state_flag  # 讓下一次顯示另一種狀態
 
     def stop_capture(self):
         if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
             # 將 system_state_label 改為 已停止擷取
-            self.system_state.setText("系統狀態： 已停止擷取")
-            self.capturing_system_state_timer.stop()
+            # self.system_state.setText("系統狀態： 已停止擷取")
+            # self.capturing_system_state_timer.stop()
 
             self.capturing = False
             new_file_path = os.path.join(self.app_dir, "img/ui/record_button_start.svg")
             self.action_button.createIcon(new_file_path)
             self.action_button.setToolTip("開始擷取畫面")
+            self.action_button.setStyleSheet(
+                "QPushButton {"
+                "    background-color: rgba(0, 0, 0, 0);"
+                "    color: rgb(58, 134, 255);"
+                #"    border: 2px solid rgb(58, 134, 255);"
+                "    border-radius: 8px;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #488EF7, stop: 1 #3478F6);"
+                "    border: none;"
+                "    color: white;"
+                "}"
+                "QPushButton:pressed {"
+                "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+                "    border: none;"
+                "    color: white;"
+                "}"
+            )
+
 
             self.action_button.clicked.disconnect()
             self.action_button.clicked.connect(self.toggle_capture)
@@ -1089,7 +1148,7 @@ class MainMenuWindow(QMainWindow):
         self.update_text_font_color(text_font_color)
         self.update_recognition_frequency(frequency)
 
-        self.system_state.setText("系統狀態：系統設定完成")
+        # self.system_state.setText("系統狀態：系統設定完成")
 
         # google_credential = self.config_handler.get_google_credential_path()
         # self.check_google_credential_state(google_credential)
@@ -1098,8 +1157,29 @@ class MainMenuWindow(QMainWindow):
         # Slot to handle the screen capture window being closed
         self.screen_capture_window = None
 
+        # set the add_window_button back to normal
+        self.add_window_button.setStyleSheet(
+            "QPushButton {"
+            "    background-color: (0, 0, 0, 0);"
+            "    color: rgb(58, 134, 255);"
+            #"    border: 2px solid rgb(58, 134, 255);"
+            "    border-radius: 8px;"
+            "}"
+            "QPushButton:hover {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #488EF7, stop: 1 #3478F6);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+            "QPushButton:pressed {"
+            "    background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #3879E3, stop: 1 #2D66EA);"
+            "    border: none;"
+            "    color: white;"
+            "}"
+        )
+
+
         # update system state
-        self.system_state.setText("系統狀態： 尚未開啟擷取視窗")
+        # self.system_state.setText("系統狀態： 尚未開啟擷取視窗")
 
     def get_frequncy(self):
         return self._frequency
