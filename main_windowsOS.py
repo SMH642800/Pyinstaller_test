@@ -742,7 +742,7 @@ class MainMenuWindow(QMainWindow):
         msg_box = QMessageBox()
         msg_box.setWindowTitle("Welcome ! ")
         msg_box.setIconPixmap(customIcon)
-        msg_box.setText("歡迎使用「此應用程式」！ \n"
+        msg_box.setText("歡迎使用「Babel Tower」！ \n"
             "\n在使用此應用程式之前，請至 【設定】 > 【系統】 > 【設置 Google 憑證】 "
             "，上傳已申請的 Google 憑證。")
 
@@ -775,14 +775,12 @@ class MainMenuWindow(QMainWindow):
         if self.is_pined:
             self.setWindowFlags(Qt.WindowStaysOnTopHint)
         self.show()
-        
-        self.is_pined = True
 
         # check if a screen capture window is already open
         if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
             # restore the screen capture window after capturing the screenshot
-            # self.screen_capture_window.showNormal()
             self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnBottomHint, False)
+            self.screen_capture_window.showNormal()
             if self.is_pined:
                 self.screen_capture_window.setWindowFlags(Qt.WindowStaysOnTopHint)
             self.screen_capture_window.show()
@@ -943,15 +941,17 @@ class MainMenuWindow(QMainWindow):
         self.settings_window.setting_window_closed.connect(self.set_main_and_capture_window_frame_window_back)
         self.settings_window.exec()
 
-        # 恢復screen_capture_window的最上层标志
-        self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
         self.setDisabled(False)  # 啟用主窗口
+        if self.is_pined:
+            # 恢復screen_capture_window的最上层标志
+            self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
         self.show()
     
         if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
-            # 恢復screen_capture_window的最上层标志
-            self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.screen_capture_window.setDisabled(False)
+            if self.is_pined:
+                # 恢復screen_capture_window的最上层标志
+                self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint, True)
             self.screen_capture_window.show()
 
         # for button in [self.add_window_button, self.action_button, self.pin_button, self.settings_button]:
@@ -998,13 +998,13 @@ class MainMenuWindow(QMainWindow):
             # self.system_state.setText("系統狀態： 已開啟擷取視窗")
 
             # 将最小化的窗口恢复到正常状态
+            self.screen_capture_window.showNormal()
             self.screen_capture_window.setWindowFlags(Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint)  # 禁用最大化功能
             if self.is_pined:
                 self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint)  # 先將 screen capture window 显示在最上面
             else:
-                self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint | False)  # 將 screen capture window 显示在最上面的 flag 拿掉
+                self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint, False)  # 將 screen capture window 显示在最上面的 flag 拿掉
             
-            self.screen_capture_window.showNormal()
             self.screen_capture_window.show()
 
             QMessageBox.warning(self, "Warning", "你已經開啟擷取視窗了!")
@@ -1139,8 +1139,10 @@ class MainMenuWindow(QMainWindow):
                 button.setEnabled(True)
 
             # 恢复screen_capture_window的最上层标志
-            self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint)
             self.screen_capture_window.setWindowFlags(Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint)
+            if self.is_pined:
+                print("trues")
+                self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint)
             self.screen_capture_window.show()
 
     def set_main_and_capture_window_frame_window_back(self):
@@ -1151,6 +1153,7 @@ class MainMenuWindow(QMainWindow):
         self.update_text_font_size(text_font_size)
         self.update_text_font_color(text_font_color)
         self.update_recognition_frequency(frequency)
+        self.update_google_credential_state()
 
         # self.system_state.setText("系統狀態：系統設定完成")
 
