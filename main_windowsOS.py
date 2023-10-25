@@ -931,7 +931,10 @@ class MainMenuWindow(QMainWindow):
 
         # self.system_state.setText("系統狀態： 正在設定系統......")
 
-        self.settings_window = SettingsWindow(self.config_handler, self.google_credential)
+        # Get the main window's screen based on its current position
+        self.main_window_screen = QApplication.screenAt(self.mapToGlobal(self.rect().topLeft()))
+
+        self.settings_window = SettingsWindow(self.config_handler, self.google_credential, self.main_window_screen)
 
         # set icon for settings dialog
         ico_path = os.path.join(self.app_dir, "img\\icon\\settings_icon.png")
@@ -1141,7 +1144,6 @@ class MainMenuWindow(QMainWindow):
             # 恢复screen_capture_window的最上层标志
             self.screen_capture_window.setWindowFlags(Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint)
             if self.is_pined:
-                print("trues")
                 self.screen_capture_window.setWindowFlag(Qt.WindowStaysOnTopHint)
             self.screen_capture_window.show()
 
@@ -1235,7 +1237,7 @@ class ScreenCaptureWindow(QMainWindow):
         layout = QHBoxLayout()
   
         # setting the geometry of window
-        self.move(self.main_window_screen.geometry().topLeft())
+        # self.move(self.main_window_screen.geometry().topLeft())
 
         # setting the geometry of window
         screen_geometry = self.main_window_screen.geometry()
