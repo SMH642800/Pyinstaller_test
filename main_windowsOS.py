@@ -697,7 +697,7 @@ class MainMenuWindow(QMainWindow):
                 button.setEnabled(False)
             
             # 設置 google_credential_label
-            self.google_credential_state.setText("Google 憑證： <font color='red'>尚未設置憑證</font> ")
+            # self.google_credential_state.setText("Google 憑證： <font color='red'>尚未設置憑證</font> ")
 
 
     def update_google_credential_state(self):
