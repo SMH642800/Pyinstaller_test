@@ -799,6 +799,13 @@ class MainMenuWindow(QMainWindow):
             self.screen_capture_window.show()
 
     def delayed_process_screenshot_function(self):
+        # check screen capture is working or not
+        if self.capturing:
+            self.stop_capture()
+            self.pause_capture = True
+            self.action_button.setEnabled(False)
+            self.settings_button.setEnabled(False)
+            
         self.minimize_all_open_windows()
 
         # start timer to delay process the screenshot function
@@ -807,13 +814,6 @@ class MainMenuWindow(QMainWindow):
     def show_screenshot_window(self):
         # stop screenshot_timer
         self.screenshot_timer.stop()
-
-        # check screen capture is working or not
-        if self.capturing:
-            self.stop_capture()
-            self.pause_capture = True
-            self.action_button.setEnabled(False)
-            self.settings_button.setEnabled(False)
 
         # Get the main window's screen based on its current position
         self.main_window_screen = QApplication.screenAt(self.mapToGlobal(self.rect().topLeft()))
