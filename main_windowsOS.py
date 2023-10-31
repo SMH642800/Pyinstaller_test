@@ -799,11 +799,16 @@ class MainMenuWindow(QMainWindow):
             self.screen_capture_window.show()
 
     def delayed_process_screenshot_function(self):
+        print(self.pause_capture)
         # check screen capture is working or not
         if self.capturing:
             self.stop_capture()
             self.pause_capture = True
-            for button in [self.add_window_button,self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button, self.settings_button]:
+
+        if self.pause_capture:
+            self.countdown_timer.stop()
+            self.resume_capture_timer.stop()
+            for button in [self.add_window_button,self.action_button, self.pin_button, self.clear_text_button, self.settings_button]:
                 button.setEnabled(False)
             
         self.minimize_all_open_windows()
@@ -897,7 +902,6 @@ class MainMenuWindow(QMainWindow):
         if self.countdown >= 0:
             self.action_button.setText(str(self.countdown + 1))
         else:
-            self.pause_capture = False
             self.countdown_timer.stop()
             self.action_button.setEnabled(True)
             self.screenshot_button.setEnabled(True)
@@ -1101,6 +1105,8 @@ class MainMenuWindow(QMainWindow):
     def start_capture(self):
         if hasattr(self, 'screen_capture_window') and self.screen_capture_window:
             self.capturing = True 
+            self.pause_capture = False
+            
             new_file_path = os.path.join(self.app_dir, "img/ui/record_button_stop.png")
             self.action_button.createIcon(new_file_path)
             self.action_button.setText("")
