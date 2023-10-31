@@ -803,8 +803,8 @@ class MainMenuWindow(QMainWindow):
         if self.capturing:
             self.stop_capture()
             self.pause_capture = True
-            self.action_button.setEnabled(False)
-            self.settings_button.setEnabled(False)
+            for button in [self.add_window_button,self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button, self.settings_button]:
+                button.setEnabled(False)
             
         self.minimize_all_open_windows()
 
@@ -889,18 +889,18 @@ class MainMenuWindow(QMainWindow):
                     self.countdown_timer.start(1000)
                 else:
                     self.pause_capture = False
-                    self.action_button.setEnabled(True)
-                    self.settings_button.setEnabled(True)
+                    for button in [self.add_window_button,self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button, self.settings_button]:
+                        button.setEnabled(True)
 
     def update_countdown_text(self):
         self.countdown -= 1
         if self.countdown >= 0:
             self.action_button.setText(str(self.countdown + 1))
         else:
-            self.countdown_timer.stop()
             self.pause_capture = False
+            self.countdown_timer.stop()
             self.action_button.setEnabled(True)
-            self.settings_button.setEnabled(True)
+            self.screenshot_button.setEnabled(True)
 
     def pin_on_top(self):
         if self.is_pined:
@@ -1219,11 +1219,13 @@ class MainMenuWindow(QMainWindow):
         # Slot to handle the screen capture window being closed
         self.screen_capture_window = None
 
+        self.pause_capture = False
+
         self.countdown_timer.stop()
         self.resume_capture_timer.stop()
 
-        self.action_button.setEnabled(True)
-        self.settings_button.setEnabled(True)
+        for button in [self.add_window_button,self.action_button, self.screenshot_button, self.pin_button, self.clear_text_button, self.settings_button]:
+            button.setEnabled(True)
 
         # set the add_window_button back to normal
         self.add_window_button.setStyleSheet(
