@@ -800,7 +800,6 @@ class MainMenuWindow(QMainWindow):
             self.screen_capture_window.show()
 
     def delayed_process_screenshot_function(self):
-        print(self.pause_capture)
         # check screen capture is working or not
         if self.capturing:
             self.stop_capture()
@@ -1133,7 +1132,7 @@ class MainMenuWindow(QMainWindow):
                 "}"
             )
 
-            self.clear_label_text()
+            # self.clear_label_text()
 
             self.action_button.clicked.disconnect()
             self.action_button.clicked.connect(self.stop_capture)
