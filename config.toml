@@ -1,0 +1,6 @@
+[Settings]
+text_font_size = 12
+text_font_color = "#FFFFFF"
+capture_frequency = "標準 (2 秒)"
+auto_recapture_state = 2
+google_cloud_key_file_path = "C:\\Users\\SMH64\\Documents\\myAppTest\\Google Credential Key\\manifest-surfer-400014-b04707cc60d4.json"

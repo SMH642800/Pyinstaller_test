@@ -20,7 +20,7 @@ class ConfigHandler():
             user_documents = os.path.expanduser("~\\Documents")
 
             # create file save path
-            location = os.path.join(user_documents, "myAppTest", "configuration")
+            location = os.path.join(user_documents, "Babel Tower", "configuration")
             file_path = os.path.join(location, "config.toml")
 
             # make sure path is exsited
