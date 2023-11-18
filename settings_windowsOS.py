@@ -7,7 +7,7 @@ from PySide6.QtCore import QStandardPaths, QUrl, Signal, QRect, QPoint, QPropert
 from PySide6.QtGui import QFont, Qt, QDesktopServices, QColor, QPainter
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, QLabel, QComboBox, QPushButton, QFrame, QColorDialog, QFileDialog, QMessageBox, QCheckBox
 
-from config_handler import *
+from config_handler_windowOS import *
 from google_credentials import *
 
 

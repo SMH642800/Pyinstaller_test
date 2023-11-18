@@ -19,7 +19,7 @@ from PySide6.QtCore import Signal, QTimer, QSize, Property, QObject, QEasingCurv
 # from google.cloud import translate_v2 as translate
 
 from settings_windowsOS import *
-from config_handler import *
+from config_handler_windowOS import *
 from google_credentials import *
 
 import time
