@@ -31,7 +31,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Babel Tower V3',
+    name='Babel Tower',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

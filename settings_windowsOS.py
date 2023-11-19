@@ -644,7 +644,7 @@ class SettingsWindow(QDialog):
                 user_documents = os.path.expanduser("~\\Documents")
 
                 # create file save path
-                location = os.path.join(user_documents, "myAppTest", "Google Credential Key")
+                location = os.path.join(user_documents, "Babel Tower", "Google Credential Key")
                 new_file_path = os.path.join(location, os.path.basename(credentials_file))
 
                 # make sure path is exsited
