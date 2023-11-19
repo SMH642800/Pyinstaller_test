@@ -1417,9 +1417,6 @@ class ScreenCaptureWindow(QMainWindow):
         self.show()
 
     def capture_screen(self):
-        
-        global capture_start
-
         if self.isVisible():
             # Get the screen where the screenshot window is displayed
             screen = self.screen()
